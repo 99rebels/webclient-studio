@@ -199,8 +199,8 @@ Notes:
 - The `--lead-score` comes from the report's "Score:" line in the Fit Assessment.
 - The `--pitch-notes` is a **pros and cons list** derived from the report's findings. Format:
   ```
-  Pros: <2-4 reasons to pitch, comma-separated>
-  Cons: <2-4 reasons it might not be worth it, comma-separated>
+  **Pros:** <2-4 reasons to pitch, comma-separated>
+  **Cons:** <2-4 reasons it might not be worth it, comma-separated>
   ```
   Frame from the freelancer's perspective: Pros = why pitch (work needed, right size, clear angle). Cons = why skip (too small, wrong location, no timing signal, hard to reach). Pick the most impactful points — don't list everything.
 - Tags come from the report's findings — check the tech stack, business type, and any notable characteristics.
