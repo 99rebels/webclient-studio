@@ -10,8 +10,6 @@
 
 {{executive_summary}}
 
-[Adapt this section to the specific client. Reference what you learned in discovery — their actual goals, their actual problem, the actual reason this project matters to their business.]
-
 ---
 
 ## Scope of Work

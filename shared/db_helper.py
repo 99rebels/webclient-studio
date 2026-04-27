@@ -209,7 +209,7 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "preferences": {
-        "currency": "GBP",
+        "currency": null,
         "followUpDays": 5,
         "statusFollowUpDays": {
             "lead": 5,
