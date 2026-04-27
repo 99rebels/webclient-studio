@@ -220,11 +220,13 @@ If a report exists: read it, extract score + research quality + compose research
 
 This flow works across sessions — the report file is the source of truth, not conversation memory.
 
-### 8. Optional: first-contact email draft
+### 8. First-contact email draft + talking points
 
 Offer once: *"Want a first-contact email draft?"*
 
-If yes, output **in chat only** (do not save). Rules (lead-qualifier.md §8):
+If yes, output **in chat only** (do not save). Always include both:
+
+**The draft email:**
 - 3–5 sentences max
 - Reference something specific from the research — not generic
 - Suggest a concrete next step (discovery call, quick chat)
@@ -232,6 +234,21 @@ If yes, output **in chat only** (do not save). Rules (lead-qualifier.md §8):
 - **Never include the qualification score** — that's internal
 - Never insult the prospect's current site
 - No pricing
+
+**Talking points** (always included after the draft):
+
+A structured brief the freelancer can use to write their own version or adapt the draft. Format:
+
+```
+**Angle:** <one-line approach — e.g. "value-led: specific things costing them enquiries">
+**Pain points:** <2-3 concrete issues found during research>
+**Key fact:** <the most noteworthy positive thing about the business>
+**Suggested opener:** <how to introduce yourself — e.g. "found via search, not a cold list">
+**Call to action:** <what to suggest — quick chat, phone call, free audit>
+**Things to avoid:** <anything that would land wrong — e.g. don't mention their competitors>
+```
+
+The talking points help the freelancer understand *why* the draft is structured the way it is, so they can adopt the strategy in their own voice.
 
 ## Anti-hallucination rules (non-negotiable)
 
