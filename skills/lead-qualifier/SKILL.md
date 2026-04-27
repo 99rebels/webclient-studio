@@ -52,18 +52,30 @@ python3 -m db_helper get-lead --company "<company name>"
 ```
 If one or more matches return, present them and ask: *"Acme Plumbing already exists (status: qualified, score: 7). Update the existing entry, or create a new one?"* Don't silently overwrite.
 
-### 3. Fetch and parse
+### 3. Fetch and crawl
 ```
-python3 -m web_research <url>
+python3 -m web_research <url> --crawl
 ```
-Returns JSON with `fetch.{accessible, source, status_code, notes}` and (if accessible) an `extraction` block of source-annotated facts: title, meta description, headings, tech-stack indicators, social links, contacts, suggested tags.
+This fetches the given URL, then automatically discovers and crawls key business pages (contact, about, services, testimonials, pricing). It parses the site's sitemap if available, falls back to homepage link extraction, and caps at 5 additional pages by default.
+
+Returns JSON with:
+- `fetch.{accessible, source, status_code, notes}` — the homepage fetch result
+- `crawl.{source, total_discovered, pages_crawled, audited_pages, not_crawled}` — what was discovered and what was crawled
+- `extraction.{facts, tech_stack, social_links, contacts, suggested_tags, missing, pages_scanned}` — merged extraction across all pages
+
+**Tell the user which pages were crawled and which were not.** Example: "Crawled 6 pages (homepage, contact, about, testimonials, and 2 others). 2 pages not crawled (faq, privacy policy)." The freelancer can manually review any skipped pages if the lead looks promising.
 
 If `accessible` is false:
 - The site is JS-rendered without Playwright, returned 4xx/5xx, or refused the request.
 - Note this explicitly in the report. Set `research_quality=LOW`. Do **not** invent a description from the URL or domain name.
 
+For single-page fetch (e.g., when the user links to a specific inner page and only wants that page checked), omit `--crawl`:
+```
+python3 -m web_research <url>
+```
+
 ### 4. Optional: search and social
-The web_research shim only fetches the URL you give it. If you want supporting context, fall back to the agent's normal web search:
+The web_research crawl covers the site's own pages. For external context, fall back to the agent's normal web search:
 - `"<company> <location>"` — to find Google Business profile, reviews
 - Look for LinkedIn / Facebook only if linked from the site or surfaced by search; do not go hunting
 
