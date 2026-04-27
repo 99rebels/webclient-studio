@@ -162,6 +162,8 @@ Score: <X>/10 | Status: <status> | Added: <date> | Data Confidence: <data_confid
 ...
 ```
 
+Filter out `tag_added` and `tag_removed` entries — tags are already displayed in their own section above. Show only meaningful actions: created, scored, status changed, follow-up, proposal created, project started, tasks added/completed, notes added.
+
 Use the action code translations from §F (History) to make activity readable.
 
 For ambiguous matches on `<client>`, present all candidates with status + score and ask the user to pick. Don't guess.
@@ -245,7 +247,7 @@ Render as a chronological timeline grouped by lead (when querying recent), or st
 - `project_started` → "Project started"
 - `task_created` → "Task added: <details>"
 - `task_completed` → "Task done: <details>"
-- `tag_added` / `tag_removed` → "Tagged / Untagged: <details>"
+- `tag_added` / `tag_removed` → filtered out (shown in Tags section instead)
 - `note_added` → "Note: <details>"
 
 ---
