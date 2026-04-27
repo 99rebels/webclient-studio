@@ -13,15 +13,17 @@ The Pipeline Tracker handles a wide range of intents. Route based on what the us
 
 | User says | Section |
 |---|---|
-| "show my pipeline" / "pipeline summary" | §A Pipeline summary |
-| "update <client> to <status>" / "mark <client> as <status>" | §B Status updates |
-| "any follow-ups needed?" / "any overdue?" | §C Follow-ups |
-| "tag <client> as <x>" / "remove <tag> from <client>" / "show all <tag> leads" | §D Tags |
-| "what happened with <client>?" / "lead history" / "what happened this week?" | §E History |
-| "find leads matching <query>" / "search for <x>" | §F Search |
-| "show <client>'s tasks" / "mark <task> done" / "add task" / "what's left to do?" | §G Tasks |
-| "how many leads this month?" / "conversion rate" | §H Stats |
-| "export my pipeline" / "export to CSV / JSON" | §I Export |
+| "show my pipeline" / "pipeline summary" | §A Master view |
+| "show qualified leads" / "show follow-ups" / "show lost" | §A Filtered views |
+| "tell me about <client>" / "<client> details" / "what do we know about <client>" | §B Deep view |
+| "update <client> to <status>" / "mark <client> as <status>" | §C Status updates |
+| "any follow-ups needed?" / "any overdue?" | §D Follow-ups |
+| "tag <client> as <x>" / "remove <tag> from <client>" / "show all <tag> leads" | §E Tags |
+| "what happened with <client>?" / "lead history" / "what happened this week?" | §F History |
+| "find leads matching <query>" / "search for <x>" | §G Search |
+| "show <client>'s tasks" / "mark <task> done" / "add task" / "what's left to do?" | §H Tasks |
+| "how many leads this month?" / "conversion rate" | §I Stats |
+| "export my pipeline" / "export to CSV / JSON" | §J Export |
 
 This skill does **not** create new leads (Lead Qualifier does) and does **not** create the initial onboarding task set (Project Onboarder does). It manages everything day-to-day after.
 
@@ -45,27 +47,115 @@ If it fails — read `~/.freelance-forge/references/setup.md` and execute the se
 
 ---
 
-## §A. Pipeline summary
+## §A. Master view
+
+The default pipeline view. Scannable, compact, action-oriented.
 
 ```
 python3 -m db_helper pipeline
 python3 -m db_helper stale
 ```
 
-Render a grouped digest:
-- **Group by status** — one section per status (lead, qualified, proposal_sent, onboarding, active, complete, lost; show custom statuses under their own group)
-- **Per row:** company name, score (if any), and one relevant data point (proposal date, days since last action, top tag)
-- **Sort within groups:** by `lead_score DESC`
-- **Stale flags inline:** prefix or suffix stale leads with `⚠️ follow up suggested (N days in <status>)`
-- **Compact:** one line per lead unless the user asked for detail
+### Display format
 
-Mention stale leads **once per session**. Don't repeat the suggestion in subsequent messages.
+**Group by status.** Use these status groups in this order:
+- 🟢 Active — currently in progress
+- 🔵 Onboarding — being set up
+- 🟡 Proposal sent — awaiting response
+- 🟠 Qualified — worth pursuing
+- ⚪ Lead — new, not yet assessed
+- 🔴 Lost — declined or unresponsive
+- ✅ Complete — finished projects
+- Custom statuses — group under their own header if they exist
 
-If the pipeline is empty: *"No leads in pipeline yet. Say 'qualify this lead: <company>' to add your first one."*
+**Per lead, one line:**
+```
+<company> — score <X>/10 — <next-action hint>
+```
+
+Where `<next-action hint>` is the most useful piece of context:
+- If proposal sent and no response: *"proposal sent <N> days ago, no response"*
+- If last follow-up was recent: *"followed up <N> days ago"*
+- If stale: *"⚠️ follow up suggested (<N> days in <status>)"*
+- If has pending tasks: *"X tasks remaining"*
+- If new: *"added <date>"*
+- If completed: *"completed <date>"*
+
+**Sort within groups:** by `lead_score DESC` (highest score = most promising = top).
+
+**Stale leads:** flag with ⚠️ inline. Mention stale leads **once per session** — don't repeat the suggestion in subsequent messages.
+
+**Compact by default.** One line per lead. No markdown tables (they render poorly in Slack and on mobile). Use structured text with bullet points per status group.
+
+### Filtered views
+
+When the user asks for a specific status or category, show only that group using the same format:
+
+```
+python3 -m db_helper pipeline --status <status>
+```
+
+Examples:
+- "show my qualified leads" → `pipeline --status qualified`
+- "what proposals are out?" → `pipeline --status proposal_sent`
+- "show lost leads" → `pipeline --status lost`
+- "any follow-ups needed?" → delegates to §D Follow-ups
+
+### Empty pipeline
+
+*"No leads in pipeline yet. Say 'qualify this lead: <company>' to add your first one."*
 
 ---
 
-## §B. Status updates
+## §B. Deep view
+
+The full client dossier. Everything we know about one lead in one place.
+
+```
+python3 -m db_helper get-lead --company "<client>"
+python3 -m db_helper tag list --lead-id <id>
+python3 -m db_helper task pending --lead-id <id>
+python3 -m db_helper activity --lead-id <id>
+```
+
+**Trigger:** "tell me about <client>", "<client> details", "what do we know about <client>", or when the user selects a lead from the master view.
+
+### Display format
+
+```
+**<Company Name>**
+Score: <X>/10 | Status: <status> | Added: <date> | Quality: <research_quality>
+
+**Research Notes**
+<research_notes from db>
+
+**Discovery Notes**
+<discovery_notes from db, or "No discovery notes yet">
+
+**Proposal Summary**
+<proposal_summary from db, or "No proposal yet">
+
+**Tags**
+<tag1>, <tag2>, <tag3>
+
+**Pending Tasks** (<count>)
+- <task 1> [<priority>] <due-date or "no due date">
+- <task 2> [<priority>] <due-date or "no due date">
+(or "No pending tasks")
+
+**Recent Activity** (last 5)
+- <date> — <human-readable action>
+- <date> — <human-readable action>
+...
+```
+
+Use the action code translations from §F (History) to make activity readable.
+
+For ambiguous matches on `<client>`, present all candidates with status + score and ask the user to pick. Don't guess.
+
+---
+
+## §C. Status updates
 
 ```
 python3 -m db_helper get-lead --company "<client>"
@@ -88,7 +178,7 @@ Output one line on success: `Acme: qualified → proposal_sent.`
 
 ---
 
-## §C. Follow-ups
+## §D. Follow-ups
 
 ```
 python3 -m db_helper stale
@@ -110,7 +200,7 @@ This updates `last_follow_up` only — it does **not** touch `status_since`. The
 
 ---
 
-## §D. Tags
+## §E. Tags
 
 ```
 python3 -m db_helper tag add --lead-id <id> --name <name> [--category custom|service|source|budget]
@@ -125,7 +215,7 @@ Combine with other queries by chaining: pipeline view → filter the rows by tag
 
 ---
 
-## §E. History
+## §F. History
 
 ```
 python3 -m db_helper activity --lead-id <id>          # full lead history
@@ -147,7 +237,7 @@ Render as a chronological timeline grouped by lead (when querying recent), or st
 
 ---
 
-## §F. Search
+## §G. Search
 
 ```
 python3 -m db_helper search "<query>"
@@ -159,7 +249,7 @@ For specific lookups by company name only, prefer `get-lead --company` (also fuz
 
 ---
 
-## §G. Tasks
+## §H. Tasks
 
 ```
 python3 -m db_helper task list --lead-id <id>
@@ -182,7 +272,7 @@ The shim auto-logs `task_created`, `task_completed` (when status → `done`), or
 
 ---
 
-## §H. Stats
+## §I. Stats
 
 For counts, query the activity log:
 
@@ -199,7 +289,7 @@ Be honest about approximation. If a stat would require multiple queries, do them
 
 ---
 
-## §I. Export
+## §J. Export
 
 ```
 python3 -m db_helper export --format csv
@@ -232,8 +322,8 @@ Never just print the raw error from the shim. Translate to actionable language.
 
 ## What requires confirmation
 
-- Status update to `lost` (§B)
-- Status update to `active` when no tasks exist (§B — flag, then confirm)
+- Status update to `lost` (§C)
+- Status update to `active` when no tasks exist (§C — flag, then confirm)
 - Deleting a lead (the shim doesn't expose this — refer the user to manual `sqlite3` if they really want to)
 
 Otherwise: status updates, tag changes, task updates, follow-ups, exports — no confirmation needed.
@@ -241,7 +331,8 @@ Otherwise: status updates, tag changes, task updates, follow-ups, exports — no
 ## End-of-turn
 
 Mostly a one-line confirmation. Examples:
-- After pipeline summary: just the digest, plus a "next?" hook only if there are stale leads worth highlighting.
+- After master view: just the digest, plus a "next?" hook only if there are stale leads worth highlighting.
+- After deep view: the full dossier. Offer relevant actions: "Want to update status, add a task, or draft a follow-up email?"
 - After status update: `Acme: qualified → proposal_sent.`
 - After tag: `Tagged Acme as 'urgent'.`
 - After export: `Exported 12 leads to ~/.freelance-forge/exports/pipeline-2026-04-26.csv.`
