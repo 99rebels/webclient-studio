@@ -165,21 +165,54 @@ If everything was verified: "⚠️ All findings above were verified from public
 3. <action>
 ```
 
-### 7. Write the database row
+### 7. Ask before adding to pipeline
+
+The report is written and saved regardless. But adding the lead to the pipeline is the freelancer's decision — show them the key details and ask.
+
+Show the user:
+- **Score:** X/10 (or "NULL — insufficient information")
+- **Verdict:** STRONG | GOOD | MODERATE | WEAK
+- **One-line summary:** the most important finding or reason
+
+Then ask: "Add to pipeline?"
+
+- **If yes:** proceed to Step 7a.
+- **If no:** stop. The report is saved at the path from Step 6 — the freelancer can come back later and add it then (see "Add from existing report" below).
+- **If they say something like "maybe later":** same as no — the report is saved, they can revisit anytime.
+
+### 7a. Write the database row
+
+Read the saved report file and extract the values from it — do NOT rely on conversation memory.
 
 ```
 python3 -m db_helper add-lead "<Company Name>" \
     --website "<URL>" \
-    --lead-score <integer or omit if NULL> \
-    --research-quality HIGH|MEDIUM|LOW \
-    --research-notes "<2–3 sentence summary, NOT the full report>" \
-    --tags "wordpress,local-business,..."
+    --lead-score <integer from report, or omit if NULL> \
+    --research-quality <from report> \
+    --research-notes "<2–3 sentence summary derived from the report>" \
+    --tags "<from report>"
 ```
 
 Notes:
-- The `research_notes` column is the **summary**, not the report. Keep it short.
+- The `research_notes` column is the **summary**, not the report. Read the report's Fit Assessment and Recommendation sections to compose it.
+- The `--lead-score` comes from the report's "Score:" line in the Fit Assessment.
+- Tags come from the report's findings — check the tech stack, business type, and any notable characteristics.
 - The shim auto-logs `lead_created` and `lead_scored` (if score given) in `activity_log`.
 - Suggested tags from `web_research`'s `extraction.suggested_tags` are a starting point — add/remove to match what you actually saw.
+
+### Add from existing report
+
+When the freelancer says something like "add [company] to my pipeline" and the lead doesn't exist yet:
+
+1. Check for a qualification report:
+```bash
+ls ~/.freelance-forge/reports/qualifications/*<company-slug>* 2>/dev/null
+```
+2. If a report exists: read it, extract score + research quality + compose research_notes from the report content, then run the `add-lead` command from Step 7a.
+3. If no report exists: tell the user "No qualification report found for [company]. Run Lead Qualifier first to create one, or add manually with score and notes."
+4. If the lead already exists in the pipeline: tell the user and offer to show the existing entry.
+
+This flow works across sessions — the report file is the source of truth, not conversation memory.
 
 ### 8. Optional: first-contact email draft
 
@@ -219,11 +252,16 @@ These come directly from `design-philosophy.md`. Every report must comply.
 | LOW research quality | Heavy uncertainty flags. Recommend manual research before contact. Don't inflate score because of missing contrary evidence. |
 | Different country | Note location, timezone, language, payment implications. Don't disqualify on location alone. |
 | Already exists in pipeline | Step 2 already handles this — present options. |
+| User says "add [company]" but no report exists | Check for saved report first (see "Add from existing report"). If nothing found, tell the user to run Lead Qualifier first or provide details manually. |
 | Config file missing | Auto-created by `db_helper` on first call. No setup step. |
 
 ## End-of-turn
 
-Tell the user: report path, lead ID, score, and any tags applied. Offer the optional email draft.
+**If the freelancer said yes to adding:** tell the user lead ID, score, and any tags applied. Offer the optional email draft.
 
-Example end-of-turn line:
-> Wrote `~/.freelance-forge/reports/qualifications/acme-plumbing-2026-04-26.md` (score 7/10, MEDIUM research quality, tags: wordpress, local-business). Want a first-contact email draft?
+**If the freelancer said no or later:** tell the user the report path. Remind them they can add it anytime.
+
+Examples:
+> Added Acme Plumbing to pipeline (score 7/10, tags: wordpress, local-business). Want a first-contact email draft?
+
+> Report saved at `~/.freelance-forge/reports/qualifications/acme-plumbing-2026-04-26.md`. You can add it to the pipeline anytime — just say "add Acme Plumbing" and I'll pull from the report.
