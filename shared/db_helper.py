@@ -99,7 +99,7 @@ _SCHEMA_SQL = [
         contact_email   TEXT,
         status          TEXT NOT NULL DEFAULT 'lead',
         lead_score      INTEGER,
-        research_quality TEXT,
+        data_confidence TEXT,
         date_added      TEXT NOT NULL,
         date_updated    TEXT NOT NULL,
         proposal_date   TEXT,
@@ -170,6 +170,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         return
     for stmt in _SCHEMA_SQL:
         conn.execute(stmt)
+    # Migration: rename research_quality → data_confidence (2026-04-27)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(leads)").fetchall()}
+    if "research_quality" in cols and "data_confidence" not in cols:
+        conn.execute("ALTER TABLE leads RENAME COLUMN research_quality TO data_confidence")
     _SCHEMA_READY = True
 
 
@@ -290,7 +294,7 @@ def get_recent_activity(days: int = 7) -> list[dict[str, Any]]:
 
 _LEAD_FIELDS = (
     "company", "website", "contact_name", "contact_email", "status",
-    "lead_score", "research_quality", "proposal_date", "last_follow_up",
+    "lead_score", "data_confidence", "proposal_date", "last_follow_up",
     "next_action", "research_notes", "discovery_notes", "proposal_summary",
     "project_path",
 )
@@ -303,7 +307,7 @@ def add_lead(
     contact_name: str | None = None,
     contact_email: str | None = None,
     lead_score: int | None = None,
-    research_quality: str | None = None,
+    data_confidence: str | None = None,
     research_notes: str | None = None,
     status: str = "lead",
     suggested_tags: list[str] | None = None,
@@ -323,7 +327,7 @@ def add_lead(
         "contact_email": contact_email,
         "status": status,
         "lead_score": lead_score,
-        "research_quality": research_quality,
+        "data_confidence": data_confidence,
         "date_added": now,
         "date_updated": now,
         "status_since": now,
@@ -453,7 +457,7 @@ def _infer_field_action(fields: dict[str, Any]) -> str:
         return "discovery_added"
     if "project_path" in fields:
         return "project_started"
-    if "research_notes" in fields or "research_quality" in fields:
+    if "research_notes" in fields or "data_confidence" in fields:
         return "research_updated"
     return "note_added"
 
@@ -742,7 +746,7 @@ def _cmd_add_lead(args: argparse.Namespace) -> None:
         contact_name=args.contact_name,
         contact_email=args.contact_email,
         lead_score=args.lead_score,
-        research_quality=args.research_quality,
+        data_confidence=args.data_confidence,
         research_notes=args.research_notes,
         suggested_tags=tags or None,
         dry_run=args.dry_run,
@@ -847,7 +851,7 @@ def _build_parser() -> argparse.ArgumentParser:
     a.add_argument("--contact-name", dest="contact_name")
     a.add_argument("--contact-email", dest="contact_email")
     a.add_argument("--lead-score", dest="lead_score", type=int)
-    a.add_argument("--research-quality", dest="research_quality")
+    a.add_argument("--data-confidence", dest="data_confidence")
     a.add_argument("--research-notes", dest="research_notes")
     a.add_argument("--tags", help="Comma-separated tag names")
     a.add_argument("--dry-run", dest="dry_run", action="store_true")

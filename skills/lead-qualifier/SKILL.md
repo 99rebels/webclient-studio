@@ -67,7 +67,7 @@ Returns JSON with:
 
 If `accessible` is false:
 - The site is JS-rendered without Playwright, returned 4xx/5xx, or refused the request.
-- Note this explicitly in the report. Set `research_quality=LOW`. Do **not** invent a description from the URL or domain name.
+- Note this explicitly in the report. Set `data_confidence=LOW`. Do **not** invent a description from the URL or domain name.
 
 For single-page fetch (e.g., when the user links to a specific inner page and only wants that page checked), omit `--crawl`:
 ```
@@ -114,7 +114,7 @@ Use this exact structure (lead-qualifier.md §6.1):
 
 **Date:** <YYYY-MM-DD>
 **Website:** <URL>
-**Research Quality:** HIGH | MEDIUM | LOW
+**Data Confidence:** HIGH | MEDIUM | LOW
 
 ---
 
@@ -214,7 +214,7 @@ If it returns results: tell the user "[Company] is already in your pipeline (sta
 ```bash
 ls ~/.freelance-forge/reports/qualifications/*<company-slug>* 2>/dev/null
 ```
-If a report exists: read it, extract score + research quality + compose research_notes from the report content, then run the `add-lead` command from Step 7a.
+If a report exists: read it, extract score + data confidence + compose research_notes from the report content, then run the `add-lead` command from Step 7a.
 
 3. If no report exists: tell the user "No qualification report found for [company]. Run Lead Qualifier first to create one, or provide details to add manually."
 
@@ -268,11 +268,11 @@ These come directly from `design-philosophy.md`. Every report must comply.
 | Scenario | Action |
 |---|---|
 | Company name only, no website found | Search for it. Still nothing → ask the user. Don't proceed without a URL or LinkedIn. |
-| Site is down / unreachable | Note in report. Try cached version or social. Flag as data quality issue. `research_quality=LOW`. |
+| Site is down / unreachable | Note in report. Try cached version or social. Flag as data quality issue. `data_confidence=LOW`. |
 | Multiple companies with similar names | Present options, ask user to confirm. Don't guess. |
 | Clearly enterprise (500+ employees) | Still produce report. Note: likely has in-house team or agency — different approach needed. |
 | Very small (micro-business) | Still produce report. Note: budget likely limited. |
-| LOW research quality | Heavy uncertainty flags. Recommend manual research before contact. Don't inflate score because of missing contrary evidence. |
+| LOW data confidence | Heavy uncertainty flags. Recommend manual research before contact. Don't inflate score because of missing contrary evidence. |
 | Different country | Note location, timezone, language, payment implications. Don't disqualify on location alone. |
 | Already exists in pipeline | Step 2 already handles this — present options. |
 | User says "add [company]" but no report exists | Check for saved report first (see "Add from existing report"). If nothing found, tell the user to run Lead Qualifier first or provide details manually. |

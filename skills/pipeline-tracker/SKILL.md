@@ -124,7 +124,7 @@ python3 -m db_helper activity --lead-id <id>
 
 ```
 **<Company Name>**
-Score: <X>/10 | Status: <status> | Added: <date> | Quality: <research_quality>
+Score: <X>/10 | Status: <status> | Added: <date> | Quality: <data_confidence>
 
 **Research Notes**
 <research_notes from db>
