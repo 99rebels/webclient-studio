@@ -107,6 +107,7 @@ _SCHEMA_SQL = [
         status_since    TEXT NOT NULL,
         next_action     TEXT,
         research_notes  TEXT,
+        pitch_notes     TEXT,
         discovery_notes TEXT,
         proposal_summary TEXT,
         project_path    TEXT
@@ -174,6 +175,9 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(leads)").fetchall()}
     if "research_quality" in cols and "data_confidence" not in cols:
         conn.execute("ALTER TABLE leads RENAME COLUMN research_quality TO data_confidence")
+    # Migration: add pitch_notes column (2026-04-27)
+    if "pitch_notes" not in cols:
+        conn.execute("ALTER TABLE leads ADD COLUMN pitch_notes TEXT")
     _SCHEMA_READY = True
 
 
@@ -295,7 +299,7 @@ def get_recent_activity(days: int = 7) -> list[dict[str, Any]]:
 _LEAD_FIELDS = (
     "company", "website", "contact_name", "contact_email", "status",
     "lead_score", "data_confidence", "proposal_date", "last_follow_up",
-    "next_action", "research_notes", "discovery_notes", "proposal_summary",
+    "next_action", "research_notes", "pitch_notes", "discovery_notes", "proposal_summary",
     "project_path",
 )
 
@@ -309,6 +313,7 @@ def add_lead(
     lead_score: int | None = None,
     data_confidence: str | None = None,
     research_notes: str | None = None,
+    pitch_notes: str | None = None,
     status: str = "lead",
     suggested_tags: list[str] | None = None,
     dry_run: bool = False,
@@ -332,6 +337,7 @@ def add_lead(
         "date_updated": now,
         "status_since": now,
         "research_notes": research_notes,
+        "pitch_notes": pitch_notes,
     }
     if dry_run:
         return {"would_insert": row, "would_tag": suggested_tags or []}
@@ -748,6 +754,7 @@ def _cmd_add_lead(args: argparse.Namespace) -> None:
         lead_score=args.lead_score,
         data_confidence=args.data_confidence,
         research_notes=args.research_notes,
+        pitch_notes=args.pitch_notes,
         suggested_tags=tags or None,
         dry_run=args.dry_run,
     )
@@ -853,6 +860,7 @@ def _build_parser() -> argparse.ArgumentParser:
     a.add_argument("--lead-score", dest="lead_score", type=int)
     a.add_argument("--data-confidence", dest="data_confidence")
     a.add_argument("--research-notes", dest="research_notes")
+    a.add_argument("--pitch-notes", dest="pitch_notes")
     a.add_argument("--tags", help="Comma-separated tag names")
     a.add_argument("--dry-run", dest="dry_run", action="store_true")
     a.set_defaults(func=_cmd_add_lead)

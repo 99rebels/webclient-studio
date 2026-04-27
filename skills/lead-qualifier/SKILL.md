@@ -188,14 +188,21 @@ Read the saved report file and extract the values from it — do NOT rely on con
 python3 -m db_helper add-lead "<Company Name>" \
     --website "<URL>" \
     --lead-score <integer from report, or omit if NULL> \
-    --research-quality <from report> \
+    --data-confidence <from report> \
     --research-notes "<2–3 sentence summary derived from the report>" \
+    --pitch-notes "<pros and cons from report>" \
     --tags "<from report>"
 ```
 
 Notes:
 - The `research_notes` column is the **summary**, not the report. Read the report's Fit Assessment and Recommendation sections to compose it.
 - The `--lead-score` comes from the report's "Score:" line in the Fit Assessment.
+- The `--pitch-notes` is a **pros and cons list** derived from the report's findings. Format:
+  ```
+  Pros: <2-4 reasons to pitch, comma-separated>
+  Cons: <2-4 reasons it might not be worth it, comma-separated>
+  ```
+  Frame from the freelancer's perspective: Pros = why pitch (work needed, right size, clear angle). Cons = why skip (too small, wrong location, no timing signal, hard to reach). Pick the most impactful points — don't list everything.
 - Tags come from the report's findings — check the tech stack, business type, and any notable characteristics.
 - The shim auto-logs `lead_created` and `lead_scored` (if score given) in `activity_log`.
 - Suggested tags from `web_research`'s `extraction.suggested_tags` are a starting point — add/remove to match what you actually saw.

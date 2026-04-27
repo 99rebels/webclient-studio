@@ -124,24 +124,37 @@ python3 -m db_helper activity --lead-id <id>
 
 ```
 **<Company Name>**
-Score: <X>/10 | Status: <status> | Added: <date> | Quality: <data_confidence>
+Score: <X>/10 | Status: <status> | Added: <date> | Data Confidence: <data_confidence>
 
 **Research Notes**
 <research_notes from db>
 
+**Pros & Cons**
+<pitch_notes from db, or "No pitch notes yet">
+
+---
+
 **Discovery Notes**
 <discovery_notes from db, or "No discovery notes yet">
+
+---
 
 **Proposal Summary**
 <proposal_summary from db, or "No proposal yet">
 
+---
+
 **Tags**
 <tag1>, <tag2>, <tag3>
+
+---
 
 **Pending Tasks** (<count>)
 - <task 1> [<priority>] <due-date or "no due date">
 - <task 2> [<priority>] <due-date or "no due date">
 (or "No pending tasks")
+
+---
 
 **Recent Activity** (last 5)
 - <date> — <human-readable action>
