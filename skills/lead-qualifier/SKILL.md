@@ -202,15 +202,21 @@ Notes:
 
 ### Add from existing report
 
-When the freelancer says something like "add [company] to my pipeline" and the lead doesn't exist yet:
+When the freelancer says something like "add [company] to my pipeline":
 
-1. Check for a qualification report:
+1. **Check the pipeline first:**
+```
+python3 -m db_helper get-lead --company "<Company Name>"
+```
+If it returns results: tell the user "[Company] is already in your pipeline (status: X, score: Y)." Offer to show the existing entry or update it.
+
+2. **Check for a qualification report:**
 ```bash
 ls ~/.freelance-forge/reports/qualifications/*<company-slug>* 2>/dev/null
 ```
-2. If a report exists: read it, extract score + research quality + compose research_notes from the report content, then run the `add-lead` command from Step 7a.
-3. If no report exists: tell the user "No qualification report found for [company]. Run Lead Qualifier first to create one, or add manually with score and notes."
-4. If the lead already exists in the pipeline: tell the user and offer to show the existing entry.
+If a report exists: read it, extract score + research quality + compose research_notes from the report content, then run the `add-lead` command from Step 7a.
+
+3. If no report exists: tell the user "No qualification report found for [company]. Run Lead Qualifier first to create one, or provide details to add manually."
 
 This flow works across sessions — the report file is the source of truth, not conversation memory.
 
