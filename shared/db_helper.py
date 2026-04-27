@@ -440,30 +440,22 @@ def update_lead_field(lead_id: str, *, dry_run: bool = False, **fields: Any) -> 
     with get_connection() as conn:
         conn.execute(f"UPDATE leads SET {sets} WHERE id = ?", values)
         summary = ", ".join(f"{k}={v!r}" for k, v in fields.items())
-        for action in _infer_field_actions(fields):
-            _log(conn, lead_id, action, summary[:200])
+        action = _infer_field_action(fields)
+        _log(conn, lead_id, action, summary[:200])
     return get_lead_by_id(lead_id)  # type: ignore[return-value]
 
 
-def _infer_field_actions(fields: dict[str, Any]) -> list[str]:
-    """Return all activity actions that apply to a multi-field update.
-
-    A single call that touches multiple semantic concerns (e.g. proposal fields
-    AND discovery notes) writes one activity_log row per concern, so the
-    timeline reflects everything that actually changed.
-    """
-    actions: list[str] = []
+def _infer_field_action(fields: dict[str, Any]) -> str:
+    """Pick the most descriptive activity action for a multi-field update."""
     if "proposal_summary" in fields or "proposal_date" in fields:
-        actions.append("proposal_created")
+        return "proposal_created"
     if "discovery_notes" in fields:
-        actions.append("discovery_added")
+        return "discovery_added"
     if "project_path" in fields:
-        actions.append("project_started")
+        return "project_started"
     if "research_notes" in fields or "research_quality" in fields:
-        actions.append("research_updated")
-    if not actions:
-        actions.append("note_added")
-    return actions
+        return "research_updated"
+    return "note_added"
 
 
 def record_follow_up(lead_id: str, *, dry_run: bool = False) -> dict[str, Any]:
