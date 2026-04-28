@@ -76,7 +76,7 @@ If they pick the template, output a structured question list in chat (not a file
 
 **Never invent discovery content.** If notes are too thin, build a minimal proposal with `[Confirm with client: ...]` placeholders.
 
-### 3. Read the full lead row
+### 3. Read the lead row and qualification report
 
 ```
 
@@ -85,7 +85,13 @@ python3 -m db_helper tag list --lead-id <lead-id>
 ```
 
 
-Combine: research notes + tags + lead score (context for tone) + discovery notes (the actual scope).
+Check the row for `qualification_report_path`:
+
+**If the path exists:** Read the full qualification report from disk. This gives you the detailed findings (tech stack, social links, contacts, website quality, unverified items) that the database summary does not capture. Use these to inform the proposal scope, positioning, and pricing.
+
+**If the path is null** (lead was added before this feature, or report was moved/deleted): Fall back to the database summary (`research_notes`, `lead_score`, tags). The proposal will be less specific but still functional.
+
+Combine: qualification report (or summary) + tags + lead score (context for tone) + discovery notes (the actual scope).
 
 ### 4. First-run pricing strategy check
 
@@ -114,7 +120,7 @@ python3 -m db_helper config set --path preferences.pricingStrategy --value '"day
 
 python3 -m templates render proposal-templates/default.md \
     --json-file /tmp/ctx.json \
-    --out "$FREELANCE_FORGE_CONFIG_DIR/reports/proposals/<slug>-<YYYY-MM-DD>.md"
+    --out "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<slug>/<slug>-<YYYY-MM-DD>-proposal.md"
 ```
 
 
@@ -154,7 +160,7 @@ The template ships with these sections — keep them in this order:
 ```
 
 python3 -m db_helper update-field <lead-id> \
-    '{"proposal_summary": "<2-3 sentence summary, NOT the full proposal>", "proposal_date": "<YYYY-MM-DD>"}'
+    '{"proposal_summary": "<2-3 sentence summary, NOT the full proposal>", "proposal_date": "<YYYY-MM-DD>", "proposal_report_path": "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<slug>/<slug>-<YYYY-MM-DD>-proposal.md"}'
 
 python3 -m db_helper update-status <lead-id> proposal_sent
 ```

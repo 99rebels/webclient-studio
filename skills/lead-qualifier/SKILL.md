@@ -107,6 +107,8 @@ $FREELANCE_FORGE_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.m
 ```
 (default: `~/.freelance-forge/reports/qualifications/...`)
 
+**Keep this flat location for the initial save.** When the freelancer adds the lead to the pipeline (Step 7a), the report is moved to the client folder. This two-step process means the report exists even if the freelancer decides not to add the lead.
+
 Use this exact structure (lead-qualifier.md §6.1):
 
 ```markdown
@@ -180,9 +182,17 @@ Then ask: "Add to pipeline?"
 - **If no:** stop. The report is saved at the path from Step 6 — the freelancer can come back later and add it then (see "Add from existing report" below).
 - **If they say something like "maybe later":** same as no — the report is saved, they can revisit anytime.
 
-### 7a. Write the database row
+### 7a. Create client folder and write the database row
 
-Read the saved report file and extract the values from it — do NOT rely on conversation memory.
+First, create the client folder and move the report:
+
+```bash
+mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>"
+mv "$FREELANCE_FORGE_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md" \
+   "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>/"
+```
+
+Then write the database row. Read the saved report file and extract the values from it — do NOT rely on conversation memory.
 
 ```
 python3 -m db_helper add-lead "<Company Name>" \
@@ -191,7 +201,9 @@ python3 -m db_helper add-lead "<Company Name>" \
     --data-confidence <from report> \
     --research-notes "<2–3 sentence summary derived from the report>" \
     --pitch-notes "<pros and cons from report>" \
-    --tags "<from report>"
+    --tags "<from report>" \
+    --client-dir-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>" \
+    --qualification-report-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>/<company-slug>-<YYYY-MM-DD>.md"
 ```
 
 Notes:
@@ -204,6 +216,8 @@ Notes:
   ```
   Frame from the freelancer's perspective: Pros = why pitch (work needed, right size, clear angle). Cons = why skip (too small, wrong location, no timing signal, hard to reach). Pick the most impactful points — don't list everything.
 - Tags come from the report's findings — check the tech stack, business type, and any notable characteristics.
+- `--client-dir-path` stores the client folder location. All future reports (proposal, onboarding) go here.
+- `--qualification-report-path` stores the qualification report location so the Proposal Builder can find and read it.
 - The shim auto-logs `lead_created` and `lead_scored` (if score given) in `activity_log`.
 - Suggested tags from `web_research`'s `extraction.suggested_tags` are a starting point — add/remove to match what you actually saw.
 
@@ -221,7 +235,11 @@ If it returns results: tell the user "[Company] is already in your pipeline (sta
 ```bash
 ls ~/.freelance-forge/reports/qualifications/*<company-slug>* 2>/dev/null
 ```
-If a report exists: read it, extract score + data confidence + compose research_notes from the report content, then run the `add-lead` command from Step 7a.
+Also check the client folder in case the report was already moved:
+```bash
+ls ~/.freelance-forge/reports/clients/<company-slug>/qualification* 2>/dev/null
+```
+If a report exists: read it, extract score + data confidence + compose research_notes from the report content, then run the `add-lead` command from Step 7a (including creating the client folder and moving the report).
 
 3. If no report exists: tell the user "No qualification report found for [company]. Run Lead Qualifier first to create one, or provide details to add manually."
 

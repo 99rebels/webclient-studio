@@ -53,7 +53,13 @@ Disambiguate fuzzy matches with the user. Once you have the lead row, also fetch
 python3 -m db_helper tag list --lead-id <lead-id>
 ```
 
-Look in `$FREELANCE_FORGE_CONFIG_DIR/reports/qualifications/` and `reports/proposals/` for related markdown files. Read them for context.
+Check the lead row for report paths:
+- `qualification_report_path` — read the qualification report if the path exists
+- `proposal_report_path` — read the proposal if the path exists
+
+**If paths are null** (lead was added before this feature): Fall back to searching `reports/qualifications/` and `reports/proposals/` for files matching the client slug.
+
+These reports give you the client context (from qualification) and agreed scope (from proposal) needed to build the project brief.
 
 ### 2. Check for existing tasks
 
@@ -63,9 +69,22 @@ python3 -m db_helper task list --lead-id <lead-id>
 
 If tasks already exist, ask: *"This client has 4 existing tasks. Add the new onboarding tasks to the existing set, or do you want to start fresh? (Starting fresh leaves the old tasks but adds the new ones — I won't delete anything.)"* Wait for the answer.
 
-### 3. Build the project directory
+### 3. Determine the project directory
 
-Create `$FREELANCE_FORGE_CONFIG_DIR/reports/projects/<client-slug>/` (slug = lowercased company, non-alphanumeric replaced with `-`).
+Check the lead row for `client_dir_path`:
+
+**If it exists:** Use that directory. This is the client folder created when the lead was added to the pipeline. All reports for this client live here.
+
+**If it is null** (lead was added before this feature): Create the folder:
+```
+mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>"
+```
+Then store it:
+```
+python3 -m db_helper update-field <lead-id> '{"client_dir_path": "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>"}'
+```
+
+Do NOT create a separate `reports/projects/<slug>/` directory. All client files go into the client folder.
 
 You'll write three files there:
 - `project-brief.md` — internal reference for the freelancer
@@ -130,7 +149,7 @@ Use the template:
 ```
 python3 -m templates render onboarding-checklists/default.md \
     --json '{"company": "<name>", "service_type": "<type>"}' \
-    --out "$FREELANCE_FORGE_CONFIG_DIR/reports/projects/<slug>/onboarding-checklist.md"
+    --out "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<slug>/onboarding-checklist.md"
 ```
 
 The checklist has four sections (project-onboarder.md §6):

@@ -43,7 +43,7 @@ def get_config_dir() -> Path:
     """
     env = os.environ.get("FREELANCE_FORGE_CONFIG_DIR")
     base = Path(env).expanduser() if env else Path.home() / DEFAULT_CONFIG_DIR_NAME
-    for sub in ("reports/qualifications", "reports/proposals", "reports/projects", "exports"):
+    for sub in ("reports/qualifications", "reports/proposals", "reports/projects", "reports/clients", "exports"):
         (base / sub).mkdir(parents=True, exist_ok=True)
     return base
 
@@ -110,7 +110,10 @@ _SCHEMA_SQL = [
         pitch_notes     TEXT,
         discovery_notes TEXT,
         proposal_summary TEXT,
-        project_path    TEXT
+        project_path    TEXT,
+        qualification_report_path TEXT,
+        proposal_report_path TEXT,
+        client_dir_path TEXT
     )
     """,
     "CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)",
@@ -171,6 +174,7 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
         return
     for stmt in _SCHEMA_SQL:
         conn.execute(stmt)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(leads)").fetchall()}
     # Migration: rename research_quality → data_confidence (2026-04-27)
     cols = {r[1] for r in conn.execute("PRAGMA table_info(leads)").fetchall()}
     if "research_quality" in cols and "data_confidence" not in cols:
@@ -178,6 +182,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     # Migration: add pitch_notes column (2026-04-27)
     if "pitch_notes" not in cols:
         conn.execute("ALTER TABLE leads ADD COLUMN pitch_notes TEXT")
+    # Migration: add report path columns and client_dir_path (2026-04-28)
+    for col in ("qualification_report_path", "proposal_report_path", "client_dir_path"):
+        if col not in cols:
+            conn.execute(f"ALTER TABLE leads ADD COLUMN {col} TEXT")
     _SCHEMA_READY = True
 
 
@@ -300,7 +308,7 @@ _LEAD_FIELDS = (
     "company", "website", "contact_name", "contact_email", "status",
     "lead_score", "data_confidence", "proposal_date", "last_follow_up",
     "next_action", "research_notes", "pitch_notes", "discovery_notes", "proposal_summary",
-    "project_path",
+    "project_path", "qualification_report_path", "proposal_report_path", "client_dir_path",
 )
 
 
@@ -316,6 +324,9 @@ def add_lead(
     pitch_notes: str | None = None,
     status: str = "lead",
     suggested_tags: list[str] | None = None,
+    qualification_report_path: str | None = None,
+    proposal_report_path: str | None = None,
+    client_dir_path: str | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
     """Insert a new lead. Logs `lead_created` (and `lead_scored` if score given).
@@ -341,6 +352,9 @@ def add_lead(
         "status_since": now,
         "research_notes": research_notes,
         "pitch_notes": pitch_notes,
+        "qualification_report_path": qualification_report_path,
+        "proposal_report_path": proposal_report_path,
+        "client_dir_path": client_dir_path,
     }
     if dry_run:
         return {"would_insert": row, "would_tag": suggested_tags or []}
@@ -759,6 +773,9 @@ def _cmd_add_lead(args: argparse.Namespace) -> None:
         research_notes=args.research_notes,
         pitch_notes=args.pitch_notes,
         suggested_tags=tags or None,
+        qualification_report_path=getattr(args, "qualification_report_path", None),
+        proposal_report_path=getattr(args, "proposal_report_path", None),
+        client_dir_path=getattr(args, "client_dir_path", None),
         dry_run=args.dry_run,
     )
     _print_json(res)
@@ -867,6 +884,9 @@ def _build_parser() -> argparse.ArgumentParser:
     a.add_argument("--research-notes", dest="research_notes")
     a.add_argument("--pitch-notes", dest="pitch_notes")
     a.add_argument("--tags", help="Comma-separated tag names")
+    a.add_argument("--qualification-report-path", dest="qualification_report_path")
+    a.add_argument("--proposal-report-path", dest="proposal_report_path")
+    a.add_argument("--client-dir-path", dest="client_dir_path")
     a.add_argument("--dry-run", dest="dry_run", action="store_true")
     a.set_defaults(func=_cmd_add_lead)
 
