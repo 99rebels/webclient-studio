@@ -25,6 +25,20 @@ PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m templates render <path> --json '...'
 ```
 
+### ⚠️ Path expansion in JSON arguments
+
+When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$FREELANCE_FORGE_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+
+```bash
+# ❌ Wrong — $FREELANCE_FORGE_CONFIG_DIR is stored as a literal string
+python3 -m db_helper update-field <id> '{"path": "$FREELANCE_FORGE_CONFIG_DIR/reports/foo"}'
+
+# ✅ Right — variable expands before JSON is built
+CLIENT_DIR="$FREELANCE_FORGE_CONFIG_DIR/reports/clients/acme"
+python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
+```
+
+This matters because the database stores paths that are later read by other skills. A literal `$HOME` works for the current user but will not resolve correctly in all contexts.
 
 
 
