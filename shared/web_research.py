@@ -163,6 +163,21 @@ _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 _PHONE_RE = re.compile(
     r"\+?\d[\d\s\-().]{7,}\d"  # loose international
 )
+# Tighter phone validation: require at least 6 consecutive digits in a cluster.
+# Catches false positives like "2025 99.999" (version numbers) and "1 2 3 4 5 6" (sequences).
+_PHONE_TIGHT_RE = re.compile(
+    r"\+?\d[\d\s\-().]{7,}\d"
+)
+_DIGIT_CLUSTER_RE = re.compile(r"\d{6,}")
+
+# Domains that indicate example/test emails, not real contacts
+_EXAMPLE_EMAIL_DOMAINS = frozenset([
+    "example.com", "example.org", "example.net",
+    "test.com", "test.org", "test.net",
+    "sample.com", "domain.com", "yourdomain.com",
+    "email.com", "company.com", "website.com",
+])
+
 _SOCIAL_HOSTS = {
     "facebook.com": "facebook",
     "instagram.com": "instagram",
@@ -171,6 +186,10 @@ _SOCIAL_HOSTS = {
     "linkedin.com": "linkedin",
     "youtube.com": "youtube",
     "tiktok.com": "tiktok",
+    # Common link-in-bio and redirect hosts
+    "linktr.ee": "linktree",
+    "t.co": "twitter",
+    "bit.ly": "unknown",
 }
 
 
@@ -244,27 +263,71 @@ def extract_company_info(html: str, url: str) -> dict[str, Any]:
         if any(sig in html_lower for sig in sigs):
             tech.append(Fact(f"Likely uses {name}", f"asset signatures: {', '.join(sigs)}", url, "MEDIUM"))
 
-    # Social links
+    # Social links — check <a> hrefs AND common data-attributes
     socials: list[Fact] = []
     seen_socials: set[str] = set()
-    for a in soup.find_all("a", href=True):
-        href = a["href"]
-        try:
-            host = urlparse(href).netloc.lower().lstrip("www.")
-        except Exception:
-            continue
-        for known_host, network in _SOCIAL_HOSTS.items():
-            if known_host in host and href not in seen_socials:
-                seen_socials.add(href)
-                socials.append(Fact(href, f"link to {network}", url, "HIGH"))
-                break
+    for a in soup.find_all("a"):
+        # Collect hrefs from standard href and data-* attributes
+        hrefs_to_check = []
+        if a.get("href"):
+            hrefs_to_check.append(a["href"])
+        for attr in ("data-href", "data-url", "data-social", "data-profile"):
+            val = a.get(attr)
+            if val:
+                hrefs_to_check.append(val)
+        for href in hrefs_to_check:
+            try:
+                host = urlparse(href).netloc.lower().lstrip("www.")
+            except Exception:
+                continue
+            for known_host, network in _SOCIAL_HOSTS.items():
+                if known_host in host and href not in seen_socials:
+                    seen_socials.add(href)
+                    # Redirect hosts (t.co, bit.ly) are less certain
+                    confidence = "LOW" if known_host in ("t.co", "bit.ly") else "HIGH"
+                    socials.append(Fact(href, f"link to {network}", url, confidence))
+                    break
 
-    # Contacts
+    # Contacts — with filtering for false positives
     body_text = soup.get_text(separator=" ")
-    emails = sorted(set(m.lower() for m in _EMAIL_RE.findall(body_text)
-                        if not m.lower().endswith((".png", ".jpg", ".svg"))))
+    emails = sorted(set(
+        m.lower() for m in _EMAIL_RE.findall(body_text)
+        if not m.lower().endswith((".png", ".jpg", ".svg"))
+        # Filter example/test email domains
+        and m.lower().split("@")[-1] not in _EXAMPLE_EMAIL_DOMAINS
+    ))
     phones_raw = _PHONE_RE.findall(body_text)
-    phones = sorted({re.sub(r"\s+", " ", p).strip() for p in phones_raw})
+    # Filter false positives:
+    # - Version numbers like "2025 99.999" (decimal-like pattern)
+    # - Sequences like "1 2 3 4 5 6" (all single digits)
+    # - Year patterns like "2024", "2025" alone
+    # - Tax/regulatory IDs near labels like VAT, UTR, REG, COMPANY REG
+    # Real phone numbers have meaningful digit grouping (2-4 digit groups).
+    _NON_PHONE_LABELS = re.compile(
+        r"(?:VAT\s*(?:NO|NUMBER)?|UTR|COMPANY\s*REG|TAX\s*ID|EIN|SSN|PASSPORT|ID\s*(?:NO|NUMBER)?)\s*[:\s]*",
+        re.I,
+    )
+    filtered_phones: list[str] = []
+    for p in phones_raw:
+        digits = re.sub(r"\D", "", p)
+        # Skip if fewer than 7 total digits (too short for any phone number)
+        if len(digits) < 7:
+            continue
+        # Skip if looks like a decimal/version number
+        stripped = re.sub(r"\s+", "", p)
+        if "." in p and re.match(r"^\d+\.\d+(\.\d+)*$", stripped):
+            continue
+        # Skip if it looks like a bare year (4 digits, no other digits)
+        if re.match(r"^\s*\d{4}\s*$", p):
+            continue
+        # Skip if near a tax/regulatory label in body text
+        label_pos = body_text.find(p)
+        if label_pos >= 0:
+            preceding = body_text[max(0, label_pos - 30):label_pos]
+            if _NON_PHONE_LABELS.search(preceding):
+                continue
+        filtered_phones.append(p)
+    phones = sorted({re.sub(r"\s+", " ", p).strip() for p in filtered_phones})
 
     if not emails and not phones:
         missing.append("No email or phone number found in body text")
@@ -339,7 +402,7 @@ def extract_links_from_html(html: str, base_url: str) -> list[dict[str, Any]]:
     links: list[dict[str, Any]] = []
     seen: set[str] = set()
     parsed_base = urlparse(base_url)
-    base_domain = parsed_base.netloc
+    base_domain = parsed_base.netloc.lower().lstrip("www.")
 
     for m in re.finditer(r'<a\s+[^>]*href=["\']([^"\' >]+)["\'][^>]*>', html, re.I):
         href = m.group(1).strip()
@@ -349,8 +412,8 @@ def extract_links_from_html(html: str, base_url: str) -> list[dict[str, Any]]:
         # Resolve relative URLs
         full = urljoin(base_url, href)
         parsed = urlparse(full)
-        # Same domain only, skip asset extensions, skip duplicates
-        if parsed.netloc != base_domain:
+        # Same domain only (strip www. for comparison — many sites mix www/non-www)
+        if parsed.netloc.lower().lstrip("www.") != base_domain:
             continue
         if _SKIP_EXTENSIONS.search(parsed.path):
             continue
@@ -391,18 +454,21 @@ def discover_pages(
     homepage_url: str,
     max_pages: int = 5,
     prefer_playwright: bool = True,
+    dom_links: list[str] | None = None,
 ) -> dict[str, Any]:
     """Discover and prioritise pages to crawl.
 
-    Three-stage discovery:
+    Four-stage discovery:
     1. Try /sitemap.xml (plain HTTP — sitemaps don't need JS rendering)
-    2. If sitemap empty/missing, extract same-domain links from homepage
-    3. Filter to key business pages, cap at max_pages
+    2. If sitemap empty/missing, try /wp-sitemap.xml (WordPress)
+    3. Extract same-domain links from homepage HTML (regex)
+    4. If still empty and dom_links provided, use Playwright-extracted DOM links
+       (catches links in JS-rendered nav, hamburger menus, shadow DOM, etc.)
 
     Returns:
         {
             "total_discovered": int,
-            "source": "sitemap" | "homepage_links" | "none",
+            "source": "sitemap" | "homepage_links" | "dom_links" | "none",
             "all_pages": [{"url", "page_type", "priority", "lastmod"}],
             "audited": [{"url", "page_type"}],
             "not_crawled": [{"url", "page_type"}],
@@ -431,10 +497,31 @@ def discover_pages(
         except Exception:
             pass
 
-    # Stage 2: Homepage link fallback
+    # Stage 2: Homepage link fallback (regex on HTML)
     homepage_links: list[dict[str, Any]] = []
     if not sitemap_pages:
         homepage_links = extract_links_from_html(homepage_html, homepage_url)
+
+    # Stage 3: Playwright DOM link fallback (if regex found nothing and dom_links provided)
+    dom_fallback_links: list[dict[str, Any]] = []
+    if not sitemap_pages and not homepage_links and dom_links:
+        seen_dom: set[str] = set()
+        parsed_base = urlparse(homepage_url)
+        base_domain = parsed_base.netloc
+        for raw_href in dom_links:
+            href = raw_href.strip()
+            if href.startswith('#') or href.startswith('javascript:') or href.startswith('mailto:'):
+                continue
+            full = urljoin(homepage_url, href)
+            parsed = urlparse(full)
+            if parsed.netloc != base_domain:
+                continue
+            if _SKIP_EXTENSIONS.search(parsed.path):
+                continue
+            norm = _normalise_url(full)
+            if norm != _normalise_url(homepage_url) and norm not in seen_dom:
+                seen_dom.add(norm)
+                dom_fallback_links.append({"url": full, "priority": None, "lastmod": None})
 
     # Combine and deduplicate
     all_discovered: dict[str, dict[str, Any]] = {}
@@ -453,8 +540,14 @@ def discover_pages(
         source = "homepage_links"
     if sitemap_pages and homepage_links:
         source = "sitemap"
+    for p in dom_fallback_links:
+        norm = _normalise_url(p["url"])
+        if norm not in all_discovered:
+            all_discovered[norm] = {**p, "page_type": classify_business_page(p["url"])}
+    if dom_fallback_links and not sitemap_pages and not homepage_links:
+        source = "dom_links"
 
-    # Stage 3: Prioritise business-relevant pages
+    # Stage 4: Prioritise business-relevant pages
     # Priority order: contact, about, services, testimonials, pricing, homepage-already-done, then others
     priority_order = {"contact": 0, "about": 1, "services": 2, "testimonials": 3, "pricing": 4, "blog": 5, "other": 6}
     all_pages_sorted = sorted(
@@ -523,6 +616,18 @@ def merge_extractions(extractions: list[dict[str, Any]]) -> dict[str, Any]:
         all_missing.update(ext.get("missing", []))
         all_tags.update(ext.get("suggested_tags", []))
 
+    # --- Post-merge consistency: remove stale missing items ---
+    # If contacts were found on any page, remove the generic "not found" message.
+    contact_missing_patterns = [
+        "No email or phone number found in body text",
+    ]
+    if all_emails or all_phones:
+        all_missing -= set(contact_missing_patterns)
+    if all_emails:
+        all_missing.discard("No email or phone number found in body text")
+    if all_phones:
+        all_missing.discard("No email or phone number found in body text")
+
     return {
         "facts": [v for v in merged_facts.values()],
         "tech_stack": list(merged_tech.values()),
@@ -573,10 +678,25 @@ def crawl_and_extract(
     # 2. Extract from homepage
     homepage_extraction = extract_company_info(homepage_fetch.html, url)
 
-    # 3. Discover pages
+    # 3. Collect DOM links from rendered HTML (Playwright-only fallback)
+    #    This catches links in JS-rendered nav, hamburger menus, shadow DOM, etc.
+    #    that the regex-based extract_links_from_html() may miss.
+    dom_links: list[str] | None = None
+    if homepage_fetch.source == "playwright" and _HAS_HTTP:
+        try:
+            soup = BeautifulSoup(homepage_fetch.html, "html.parser")
+            dom_links = [a.get("href", "") for a in soup.find_all("a", href=True) if a.get("href")]
+        except Exception:
+            dom_links = None
+
+    # 4. Discover pages
     parsed = urlparse(url)
     base_url = f"{parsed.scheme}://{parsed.netloc}"
-    discovery = discover_pages(base_url, homepage_fetch.html, url, max_pages=max_pages, prefer_playwright=prefer_playwright)
+    discovery = discover_pages(
+        base_url, homepage_fetch.html, url,
+        max_pages=max_pages, prefer_playwright=prefer_playwright,
+        dom_links=dom_links,
+    )
 
     result["crawl"] = {
         "source": discovery["source"],

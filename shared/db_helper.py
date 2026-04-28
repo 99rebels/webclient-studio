@@ -322,6 +322,9 @@ def add_lead(
 
     Suggested tags are inserted in the same transaction.
     """
+    if lead_score is not None and not (1 <= lead_score <= 10):
+        raise ValueError(f"lead_score must be 1-10, got {lead_score}")
+
     now = _now()
     lead_id = _new_id()
     row = {
@@ -785,7 +788,9 @@ def _cmd_status(args: argparse.Namespace) -> None:
 
 
 def _cmd_update_field(args: argparse.Namespace) -> None:
-    fields = json.loads(args.json)
+    # Support both positional arg and --json flag
+    json_str = args.json_flag if getattr(args, 'json_flag', None) else args.json
+    fields = json.loads(json_str)
     _print_json(update_lead_field(args.lead_id, dry_run=args.dry_run, **fields))
 
 
@@ -889,7 +894,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
     uf = sub.add_parser("update-field")
     uf.add_argument("lead_id")
-    uf.add_argument("json", help='JSON object of field updates, e.g. {"proposal_summary": "..."}')
+    uf.add_argument("json", nargs="?", default=None, help='JSON object of field updates, e.g. {"proposal_summary": "..."}')
+    uf.add_argument("--json", dest="json_flag", default=None, help='JSON object of field updates (alternative to positional)')
     uf.add_argument("--dry-run", dest="dry_run", action="store_true")
     uf.set_defaults(func=_cmd_update_field)
 

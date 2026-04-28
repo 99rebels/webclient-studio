@@ -2,7 +2,7 @@
 
 A skill bundle for freelance web designers. Qualify leads, generate proposals, onboard clients, and track your pipeline — all through your AI agent.
 
-**Zero setup. No API keys. No external services.** Everything runs locally.
+**Minimal setup. No API keys. No external services.** Everything runs locally.
 
 ## What's Included
 
@@ -15,18 +15,9 @@ A skill bundle for freelance web designers. Qualify leads, generate proposals, o
 
 ## Install
 
-```bash
-# Clone or download the bundle, then:
-./install.sh
-```
+Clone or download the bundle and place the four skill folders (`lead-qualifier`, `proposal-builder`, `project-onboarder`, `pipeline-tracker`) in your agent's skills directory. On first use, each skill detects the shared scripts and sets up automatically — no manual configuration needed.
 
-The installer will:
-1. Detect your agent's skills directory (OpenClaw, Claude Code, or custom)
-2. Copy all four skills to the right place
-3. Install shared scripts and templates to `~/.freelance-forge/`
-4. Optionally install Playwright + Chromium for JS-rendered site research
-
-Re-run anytime to upgrade — your data is never touched.
+Optional: install Playwright + Chromium for better research on JS-rendered websites (`pip install playwright && playwright install chromium`). The Lead Qualifier works without it but produces lower-quality results on modern sites.
 
 ## Quick Start
 
