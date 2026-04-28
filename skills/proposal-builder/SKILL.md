@@ -53,7 +53,31 @@ python3 -m db_helper get-lead --company "<client name>"
 Three paths:
 - **Exactly one match** → continue with that lead row.
 - **Multiple matches (fuzzy)** → present them with `id`, `status`, `score`. Ask the user which one.
-- **No match** → tell the user. Offer:
+- **No match** → check for a qualification report before asking:
+
+```
+ls ~/.freelance-forge/reports/qualifications/*<client-slug>* 2>/dev/null
+```
+
+**If a qualification report exists:** The freelancer already qualified this lead but hasn't added it to the pipeline yet. Auto-add it silently — extract the score, data confidence, and summary from the report, create the client folder, move the report, and store the paths. Then continue to Step 2.
+
+```
+# Create client folder and move report
+mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>"
+mv ~/.freelance-forge/reports/qualifications/*<client-slug>*    "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>/"
+
+# Add to pipeline with report paths
+python3 -m db_helper add-lead "<Company Name>" \
+    --website "<URL from report>" \
+    --lead-score <score from report> \
+    --data-confidence <from report> \
+    --research-notes "<summary from report>" \
+    --tags "<from report>" \
+    --client-dir-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>" \
+    --qualification-report-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>/<report-filename>"
+```
+
+**No report either:** Offer:
   1. Run Lead Qualifier first (recommended — better proposal context).
   2. Create a minimal lead row right now and proceed.
   3. Cancel.

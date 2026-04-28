@@ -47,6 +47,13 @@ If it fails — read `~/.freelance-forge/references/setup.md` and execute the se
 python3 -m db_helper get-lead --company "<client>"
 ```
 
+**No match?** Check for a qualification report:
+```
+ls ~/.freelance-forge/reports/qualifications/*<client-slug>* 2>/dev/null
+```
+**If found:** Auto-add the lead to the pipeline (same flow as Proposal Builder Step 1 — create client folder, move report, store paths). Then proceed.
+**If not found:** Tell the user "No lead matching '<client>'. Run Lead Qualifier first or provide the company name." Offer to cancel.
+
 Disambiguate fuzzy matches with the user. Once you have the lead row, also fetch tags and any earlier qualification/proposal files:
 
 ```
@@ -57,7 +64,12 @@ Check the lead row for report paths:
 - `qualification_report_path` — read the qualification report if the path exists
 - `proposal_report_path` — read the proposal if the path exists
 
-**If paths are null** (lead was added before this feature): Fall back to searching `reports/qualifications/` and `reports/proposals/` for files matching the client slug.
+**If paths are null** (legacy lead from before client folders): Auto-migrate. Search for reports in the flat directories:
+```
+ls ~/.freelance-forge/reports/qualifications/*<company-slug>* 2>/dev/null
+ls ~/.freelance-forge/reports/proposals/*<company-slug>* 2>/dev/null
+```
+If any reports found: create the client folder, move them, and store the paths (same migration pattern as Proposal Builder Step 3). If none found: proceed without reports (they may have been deleted).
 
 These reports give you the client context (from qualification) and agreed scope (from proposal) needed to build the project brief.
 
