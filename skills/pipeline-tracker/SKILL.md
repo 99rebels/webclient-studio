@@ -381,12 +381,19 @@ python3 -m db_helper add-lead "<Company Name>" \
     --contact-email "<email>" \
     --lead-score <score or omit if NULL> \
     --data-confidence LOW \
-    --status lead \
     --tags "imported" \
     --research-notes "Imported from <filename> on <date>"
 ```
 
 Only include flags for fields that were mapped. Omit unmapped fields entirely (let db_helper defaults apply).
+
+**Status handling:** `add-lead` does not accept a `--status` flag — all new leads enter as `lead`. If the CSV maps a status column and the value is a valid status other than `lead`, run `update-status` immediately after adding:
+
+```bash
+python3 -m db_helper update-status <lead-id> <status>
+```
+
+This two-step is only needed for non-default statuses. Most imports will just use the default `lead`.
 
 **8. Summary.** Report total imported, skipped (duplicates), and any issues.
 
