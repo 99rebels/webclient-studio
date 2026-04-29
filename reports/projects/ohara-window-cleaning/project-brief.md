@@ -84,7 +84,7 @@ From proposal (estimated from kickoff):
 
 ## Links
 
-- Qualification report: `~/.freelance-forge/reports/qualifications/ohara-window-cleaning-2026-04-27.md`
-- Proposal: `~/.freelance-forge/reports/proposals/ohara-window-cleaning-2026-04-27.md`
-- Project directory: `~/.freelance-forge/reports/projects/ohara-window-cleaning/`
+- Qualification report: `~/.webclient-studio/reports/qualifications/ohara-window-cleaning-2026-04-27.md`
+- Proposal: `~/.webclient-studio/reports/proposals/ohara-window-cleaning-2026-04-27.md`
+- Project directory: `~/.webclient-studio/reports/projects/ohara-window-cleaning/`
 - Client website: https://oharawindowcleaning.ie/

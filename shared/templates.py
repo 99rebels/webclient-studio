@@ -1,4 +1,4 @@
-"""Minimal template renderer for Freelance Forge.
+"""Minimal template renderer for WebClient Studio.
 
 Two constructs only:
 - {{var}}                         → context["var"] (or "" if missing)
@@ -82,14 +82,14 @@ def render_string(template: str, context: dict[str, Any]) -> str:
 def _references_search_paths() -> list[Path]:
     """Where to look for templates when given a relative path.
 
-    Order: env var > ~/.freelance-forge/references/ > sibling references/ > inside this module's dir.
+    Order: env var > ~/.webclient-studio/references/ > sibling references/ > inside this module's dir.
     """
     paths: list[Path] = []
-    env = os.environ.get("FREELANCE_FORGE_REFERENCES_DIR")
+    env = os.environ.get("WEBCLIENT_STUDIO_REFERENCES_DIR")
     if env:
         paths.append(Path(env).expanduser())
-    # ~/.freelance-forge/references/ — the standard install location
-    paths.append(Path.home() / ".freelance-forge" / "references")
+    # ~/.webclient-studio/references/ — the standard install location
+    paths.append(Path.home() / ".webclient-studio" / "references")
     # Source-repo layout (for development)
     here = Path(__file__).resolve().parent
     paths.append(here.parent / "references")

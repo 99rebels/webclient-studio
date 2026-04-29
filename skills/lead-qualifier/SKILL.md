@@ -5,7 +5,7 @@ description: Research and score a prospective freelance web design client. Use w
 
 # Lead Qualifier
 
-Research a prospective client, score them 1–10 as a fit for a freelance web designer, write an honest qualification report, and store a summary row in the pipeline database. This skill is the entry point of the Freelance Forge pipeline — every later skill (proposal, onboarding, tracking) reads what this skill writes.
+Research a prospective client, score them 1–10 as a fit for a freelance web designer, write an honest qualification report, and store a summary row in the pipeline database. This skill is the entry point of the WebClient Studio pipeline — every later skill (proposal, onboarding, tracking) reads what this skill writes.
 
 ## When to use this skill
 
@@ -20,24 +20,24 @@ If the user mentions a company by name *without* a URL, find the website first (
 
 ## Tools
 
-This skill uses CLI shims from the bundle's shared scripts. The shared scripts live at `$FREELANCE_FORGE_CONFIG_DIR/shared/` (default: `~/.freelance-forge/shared/`). Run shims with that directory on `PYTHONPATH`:
+This skill uses CLI shims from the bundle's shared scripts. The shared scripts live at `$WEBCLIENT_STUDIO_CONFIG_DIR/shared/` (default: `~/.webclient-studio/shared/`). Run shims with that directory on `PYTHONPATH`:
 
 ```bash
-SHARED="${FREELANCE_FORGE_CONFIG_DIR:-$HOME/.freelance-forge}/shared"
+SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m web_research <url>
 ```
 
 ### ⚠️ Path expansion in JSON arguments
 
-When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$FREELANCE_FORGE_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$WEBCLIENT_STUDIO_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
 
 ```bash
-# ❌ Wrong — $FREELANCE_FORGE_CONFIG_DIR is stored as a literal string
-python3 -m db_helper update-field <id> '{"path": "$FREELANCE_FORGE_CONFIG_DIR/reports/foo"}'
+# ❌ Wrong — $WEBCLIENT_STUDIO_CONFIG_DIR is stored as a literal string
+python3 -m db_helper update-field <id> '{"path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/foo"}'
 
 # ✅ Right — variable expands before JSON is built
-CLIENT_DIR="$FREELANCE_FORGE_CONFIG_DIR/reports/clients/acme"
+CLIENT_DIR="$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme"
 python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
 ```
 
@@ -47,12 +47,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before the flow below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '$HOME/.freelance-forge/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed to Flow.
 
-If it fails — read `~/.freelance-forge/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
+If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
 
 ## Flow
 
@@ -80,9 +80,9 @@ Imported leads are already in the pipeline — the user decided they want to wor
 1. Run Steps 3–6 as normal (fetch, crawl, score, write report).
 2. **Create the client folder** (it wasn't created during import):
    ```bash
-   mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>"
-   mv "$FREELANCE_FORGE_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md" \
-      "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>/"
+   mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>"
+   mv "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md" \
+      "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>/"
    ```
 3. **Update the existing row** instead of creating a new one:
    ```bash
@@ -145,9 +145,9 @@ Honesty rules (lead-qualifier.md §5.3):
 
 Save to:
 ```
-$FREELANCE_FORGE_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md
+$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md
 ```
-(default: `~/.freelance-forge/reports/qualifications/...`)
+(default: `~/.webclient-studio/reports/qualifications/...`)
 
 **Keep this flat location for the initial save.** When the freelancer adds the lead to the pipeline (Step 7a), the report is moved to the client folder. This two-step process means the report exists even if the freelancer decides not to add the lead.
 
@@ -229,9 +229,9 @@ Then ask: "Add to pipeline?"
 First, create the client folder and move the report:
 
 ```bash
-mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>"
-mv "$FREELANCE_FORGE_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md" \
-   "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>/"
+mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>"
+mv "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md" \
+   "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>/"
 ```
 
 Then write the database row. Read the saved report file and extract the values from it — do NOT rely on conversation memory.
@@ -244,8 +244,8 @@ python3 -m db_helper add-lead "<Company Name>" \
     --research-notes "<2–3 sentence summary derived from the report>" \
     --pitch-notes "<pros and cons from report>" \
     --tags "<from report>" \
-    --client-dir-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>" \
-    --qualification-report-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>/<company-slug>-<YYYY-MM-DD>.md"
+    --client-dir-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>" \
+    --qualification-report-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>/<company-slug>-<YYYY-MM-DD>.md"
 ```
 
 Notes:
@@ -275,11 +275,11 @@ If it returns results: tell the user "[Company] is already in your pipeline (sta
 
 2. **Check for a qualification report:**
 ```bash
-ls ~/.freelance-forge/reports/qualifications/*<company-slug>* 2>/dev/null
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<company-slug>* 2>/dev/null
 ```
 Also check the client folder in case the report was already moved:
 ```bash
-ls ~/.freelance-forge/reports/clients/<company-slug>/qualification* 2>/dev/null
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/clients/<company-slug>/qualification* 2>/dev/null
 ```
 If a report exists: read it, extract score + data confidence + compose research_notes from the report content, then run the `add-lead` command from Step 7a (including creating the client folder and moving the report).
 
@@ -354,4 +354,4 @@ These come directly from `design-philosophy.md`. Every report must comply.
 Examples:
 > Added Acme Plumbing to pipeline (score 7/10, tags: wordpress, local-business). Want a first-contact email draft?
 
-> Report saved at `~/.freelance-forge/reports/qualifications/acme-plumbing-2026-04-26.md`. You can add it to the pipeline anytime — just say "add Acme Plumbing" and I'll pull from the report.
+> Report saved at `~/.webclient-studio/reports/qualifications/acme-plumbing-2026-04-26.md`. You can add it to the pipeline anytime — just say "add Acme Plumbing" and I'll pull from the report.

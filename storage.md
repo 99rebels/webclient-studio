@@ -1,4 +1,4 @@
-# Freelance Forge — Local Storage Specification
+# WebClient Studio — Local Storage Specification
 
 **Version:** 0.1
 **Date:** 2026-04-26
@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-All persistent data for Freelance Forge lives locally in a single directory. There is no external database, no API authentication, no cloud dependency. The agent reads and writes a SQLite database for structured data and markdown files for human-readable reports.
+All persistent data for WebClient Studio lives locally in a single directory. There is no external database, no API authentication, no cloud dependency. The agent reads and writes a SQLite database for structured data and markdown files for human-readable reports.
 
 **Why local storage instead of Notion/external CRM:**
 - Zero setup — no API keys, no integrations, no auth flows
@@ -23,7 +23,7 @@ All persistent data for Freelance Forge lives locally in a single directory. The
 ## 2. Directory Structure
 
 ```
-~/.freelance-forge/
+~/.webclient-studio/
 ├── pipeline.db                          # SQLite database (structured data)
 ├── config.json                          # User preferences
 └── reports/
@@ -39,11 +39,11 @@ All persistent data for Freelance Forge lives locally in a single directory. The
 ```
 
 **Environment variables:**
-- `FREELANCE_FORGE_CONFIG_DIR` — base directory (default: `~/.freelance-forge/`)
+- `WEBCLIENT_STUDIO_CONFIG_DIR` — base directory (default: `~/.webclient-studio/`)
 - No other env vars required for storage. No tokens, no API keys.
 
 **Path resolution:**
-All sub-skills resolve paths through the config manager. If `FREELANCE_FORGE_CONFIG_DIR` is set, use it. Otherwise, default to `~/.freelance-forge/`. Create the directory and subdirectories on first run if they don't exist.
+All sub-skills resolve paths through the config manager. If `WEBCLIENT_STUDIO_CONFIG_DIR` is set, use it. Otherwise, default to `~/.webclient-studio/`. Create the directory and subdirectories on first run if they don't exist.
 
 ---
 
@@ -188,7 +188,7 @@ Both configurable in `config.json`.
 
 ## 4. Config File
 
-Stored at `$FREELANCE_FORGE_CONFIG_DIR/config.json`. Minimal — just user preferences. No tokens, no database IDs, no field mappings.
+Stored at `$WEBCLIENT_STUDIO_CONFIG_DIR/config.json`. Minimal — just user preferences. No tokens, no database IDs, no field mappings.
 
 ```json
 {

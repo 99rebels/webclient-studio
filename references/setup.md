@@ -1,4 +1,4 @@
-# Freelance Forge — First Run Setup
+# WebClient Studio — First Run Setup
 
 This file contains the setup instructions for the agent to execute. A skill should only reach this file if the guard clause fails (see below).
 
@@ -7,7 +7,7 @@ This file contains the setup instructions for the agent to execute. A skill shou
 Before any skill flow, run:
 
 ```bash
-python3 -c "import sys; sys.path.insert(0, '$HOME/.freelance-forge/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If this prints `OK`, skip everything below and proceed with the skill flow.
@@ -22,10 +22,10 @@ If it fails, execute the setup steps below **in order**.
 
 The shared scripts, references, and skill files need to be installed. Find the bundle source by checking these locations in order:
 
-1. `$FREELANCE_FORGE_BUNDLE_DIR/` (if set — Agensi or user may define this)
+1. `$WEBCLIENT_STUDIO_BUNDLE_DIR/` (if set — Agensi or user may define this)
 2. The directory two levels up from this SKILL.md's location (`../../shared/`, `../../references/`, `../../skills/`)
-3. `$HOME/Downloads/freelance-forge/` or `$HOME/Desktop/freelance-forge/` (common download locations)
-4. Ask the user: "Where did you download the Freelance Forge bundle?"
+3. `$HOME/Downloads/webclient-studio/` or `$HOME/Desktop/webclient-studio/` (common download locations)
+4. Ask the user: "Where did you download the WebClient Studio bundle?"
 
 Once found, confirm all three directories exist at that location:
 - `shared/` (Python modules)
@@ -53,21 +53,21 @@ SKILLS_DIR="<skills-directory-found-above>"
 ### Step 3: Create all directories
 
 ```bash
-mkdir -p ~/.freelance-forge/shared
-mkdir -p ~/.freelance-forge/references
-mkdir -p ~/.freelance-forge/reports/{qualifications,proposals,projects}
-mkdir -p ~/.freelance-forge/exports
+mkdir -p "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
+mkdir -p "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/references"
+mkdir -p "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/reports/{qualifications,proposals,projects}"
+mkdir -p "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/exports"
 ```
 
 ### Step 4: Copy shared scripts
 
 ```bash
-cp -r "$BUNDLE_SOURCE/shared/"* ~/.freelance-forge/shared/
+cp -r "$BUNDLE_SOURCE/shared/"* "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared/
 ```
 
 Verify:
 ```bash
-ls ~/.freelance-forge/shared/db_helper.py ~/.freelance-forge/shared/web_research.py ~/.freelance-forge/shared/templates.py
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared/db_helper.py" "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared/web_research.py" "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared/templates.py"
 ```
 
 All three files must exist. If any are missing, the copy failed — troubleshoot before continuing.
@@ -75,12 +75,12 @@ All three files must exist. If any are missing, the copy failed — troubleshoot
 ### Step 5: Copy references
 
 ```bash
-cp -r "$BUNDLE_SOURCE/references/"* ~/.freelance-forge/references/
+cp -r "$BUNDLE_SOURCE/references/"* "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/references/
 ```
 
 Verify:
 ```bash
-ls ~/.freelance-forge/references/proposal-templates/default.md
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/references/proposal-templates/default.md"
 ```
 
 ### Step 6: Copy skill files to the agent's skills directory
@@ -122,7 +122,7 @@ If `pip3` isn't available, try `pip`. If neither exists, tell the user Python 3 
 
 Tell the user:
 
-> Freelance Forge uses Playwright to research company websites. Most modern websites are JavaScript-rendered (React, Next.js, Vue) and cannot be properly read without it. This is a ~150MB install. **You can skip it, but the Lead Qualifier will produce lower-quality results on most websites.** It is highly recommended to install it now.
+> WebClient Studio uses Playwright to research company websites. Most modern websites are JavaScript-rendered (React, Next.js, Vue) and cannot be properly read without it. This is a ~150MB install. **You can skip it, but the Lead Qualifier will produce lower-quality results on most websites.** It is highly recommended to install it now.
 
 Ask: "Install Playwright now?"
 
@@ -148,11 +148,11 @@ Run all three checks. All must pass:
 
 ```bash
 # 1. Python module imports
-python3 -c "import sys; sys.path.insert(0, '$HOME/.freelance-forge/shared'); import db_helper; print('db_helper: OK')"
+python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper; print('db_helper: OK')"
 
 # 2. Config and DB paths resolve
 python3 -c "
-import sys; sys.path.insert(0, '$HOME/.freelance-forge/shared')
+import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared')
 import db_helper
 print('Config dir:', db_helper.get_config_dir())
 print('DB path:', db_helper.db_path())
@@ -164,13 +164,13 @@ python3 -c "import requests; from bs4 import BeautifulSoup; print('deps: OK')"
 ```
 
 If any check fails, troubleshoot before continuing. Common issues:
-- Wrong `PYTHONPATH` — confirm `~/.freelance-forge/shared/` contains `db_helper.py`
+- Wrong `PYTHONPATH` — confirm `${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared/` contains `db_helper.py`
 - Missing pip packages — re-run Step 7
 - Python 3 not found — install from python.org
 
 ### Step 10: Tell the user
 
-> Setup complete. Your pipeline database and config are at `~/.freelance-forge/`. You're ready to go.
+> Setup complete. Your pipeline database and config are at `${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/`. You're ready to go.
 
 Then proceed with the original skill flow that triggered setup.
 

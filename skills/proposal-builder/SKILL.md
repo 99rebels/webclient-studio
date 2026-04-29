@@ -20,21 +20,21 @@ Trigger phrases:
 ## Tools
 
 ```bash
-SHARED="${FREELANCE_FORGE_CONFIG_DIR:-$HOME/.freelance-forge}/shared"
+SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m templates render <path> --json '...'
 ```
 
 ### ⚠️ Path expansion in JSON arguments
 
-When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$FREELANCE_FORGE_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$WEBCLIENT_STUDIO_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
 
 ```bash
-# ❌ Wrong — $FREELANCE_FORGE_CONFIG_DIR is stored as a literal string
-python3 -m db_helper update-field <id> '{"path": "$FREELANCE_FORGE_CONFIG_DIR/reports/foo"}'
+# ❌ Wrong — $WEBCLIENT_STUDIO_CONFIG_DIR is stored as a literal string
+python3 -m db_helper update-field <id> '{"path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/foo"}'
 
 # ✅ Right — variable expands before JSON is built
-CLIENT_DIR="$FREELANCE_FORGE_CONFIG_DIR/reports/clients/acme"
+CLIENT_DIR="$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme"
 python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
 ```
 
@@ -46,12 +46,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before the flow below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '$HOME/.freelance-forge/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed to Flow.
 
-If it fails — read `~/.freelance-forge/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
+If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
 
 
 ## Flow
@@ -70,15 +70,15 @@ Three paths:
 - **No match** → check for a qualification report before asking:
 
 ```
-ls ~/.freelance-forge/reports/qualifications/*<client-slug>* 2>/dev/null
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<client-slug>* 2>/dev/null
 ```
 
 **If a qualification report exists:** The freelancer already qualified this lead but hasn't added it to the pipeline yet. Auto-add it silently — extract the score, data confidence, and summary from the report, create the client folder, move the report, and store the paths. Then continue to Step 2.
 
 ```
 # Create client folder and move report
-mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>"
-mv ~/.freelance-forge/reports/qualifications/*<client-slug>*    "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>/"
+mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"
+mv "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<client-slug>* "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/reports/clients/<client-slug>/"
 
 # Add to pipeline with report paths
 python3 -m db_helper add-lead "<Company Name>" \
@@ -87,8 +87,8 @@ python3 -m db_helper add-lead "<Company Name>" \
     --data-confidence <from report> \
     --research-notes "<summary from report>" \
     --tags "<from report>" \
-    --client-dir-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>" \
-    --qualification-report-path "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>/<report-filename>"
+    --client-dir-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>" \
+    --qualification-report-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>/<report-filename>"
 ```
 
 **No report either:** Offer:
@@ -158,7 +158,7 @@ python3 -m db_helper config set --path preferences.pricingStrategy --value '"day
 
 python3 -m templates render proposal-templates/default.md \
     --json-file /tmp/ctx.json \
-    --out "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<slug>/<slug>-<YYYY-MM-DD>-proposal.md"
+    --out "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<slug>/<slug>-<YYYY-MM-DD>-proposal.md"
 ```
 
 
@@ -198,7 +198,7 @@ The template ships with these sections — keep them in this order:
 ```
 
 python3 -m db_helper update-field <lead-id> \
-    '{"proposal_summary": "<2-3 sentence summary, NOT the full proposal>", "proposal_date": "<YYYY-MM-DD>", "proposal_report_path": "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<slug>/<slug>-<YYYY-MM-DD>-proposal.md"}'
+    '{"proposal_summary": "<2-3 sentence summary, NOT the full proposal>", "proposal_date": "<YYYY-MM-DD>", "proposal_report_path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<slug>/<slug>-<YYYY-MM-DD>-proposal.md"}'
 
 python3 -m db_helper update-status <lead-id> proposal_sent
 ```
@@ -241,4 +241,4 @@ If yes, output **in chat only**. Rules (proposal-builder.md §8):
 Tell the user: file path, status now `proposal_sent`, summary of what was included, any `[Confirm with client: ...]` placeholders left in the document. Offer the optional covering email.
 
 Example:
-> Wrote `~/.freelance-forge/reports/proposals/acme-plumbing-2026-04-26.md`. Status updated to `proposal_sent`. The proposal has 2 placeholders to confirm with the client (booking system features, content delivery deadline). Want a covering email draft?
+> Wrote `~/.webclient-studio/reports/proposals/acme-plumbing-2026-04-26.md`. Status updated to `proposal_sent`. The proposal has 2 placeholders to confirm with the client (booking system features, content delivery deadline). Want a covering email draft?

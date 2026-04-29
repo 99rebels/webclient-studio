@@ -1,4 +1,4 @@
-# Freelance Forge — Architecture Document
+# WebClient Studio — Architecture Document
 
 **Version:** 0.2 — Design Phase
 **Date:** 2026-04-26
@@ -12,7 +12,7 @@
 
 ### What It Is
 
-Freelance Forge is a multi-skill bundle that automates the client lifecycle for freelance web designers. One install gives the agent four workflow skills: lead qualification, proposal generation, project onboarding, and pipeline tracking — all connected through a local database.
+WebClient Studio is a multi-skill bundle that automates the client lifecycle for freelance web designers. One install gives the agent four workflow skills: lead qualification, proposal generation, project onboarding, and pipeline tracking — all connected through a local database.
 
 ### Target User
 
@@ -35,7 +35,7 @@ Every freelancer does the same repetitive work: research a lead, score whether t
 
 ### 2.1 Local SQLite Database Is the Single Source of Truth
 
-All persistent structured data lives in a local SQLite database (`~/.freelance-forge/pipeline.db`). Full reports live as markdown files alongside the database. When Lead Qualifier finishes, it writes to the database. When Proposal Builder starts, it reads from the database. The database is the communication layer between sub-skills.
+All persistent structured data lives in a local SQLite database (`~/.webclient-studio/pipeline.db`). Full reports live as markdown files alongside the database. When Lead Qualifier finishes, it writes to the database. When Proposal Builder starts, it reads from the database. The database is the communication layer between sub-skills.
 
 **Why:** Zero setup — no API keys, no external services, no authentication. Data is fully portable (single directory). Schema is controlled by us (no discovery or mapping complexity). Reports and metadata live in the same place. Users who want Notion/Sheets can export via CSV/JSON. See `storage.md` for the full specification.
 
@@ -165,7 +165,7 @@ No sub-skill reads another sub-skill's output files. Everything flows through th
 
 All persistent data is stored locally. See `storage.md` for the full specification including:
 - Database schema (leads, tags, activity_log, tasks tables)
-- Directory structure (`~/.freelance-forge/`)
+- Directory structure (`~/.webclient-studio/`)
 - Config file format
 - Database helper module design
 - Export functionality (CSV/JSON)
@@ -173,9 +173,9 @@ All persistent data is stored locally. See `storage.md` for the full specificati
 
 ### 4.1 Quick Reference
 
-**Database location:** `$FREELANCE_FORGE_CONFIG_DIR/pipeline.db` (default: `~/.freelance-forge/pipeline.db`)
-**Config location:** `$FREELANCE_FORGE_CONFIG_DIR/config.json`
-**Reports directory:** `$FREELANCE_FORGE_CONFIG_DIR/reports/`
+**Database location:** `$WEBCLIENT_STUDIO_CONFIG_DIR/pipeline.db` (default: `~/.webclient-studio/pipeline.db`)
+**Config location:** `$WEBCLIENT_STUDIO_CONFIG_DIR/config.json`
+**Reports directory:** `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/`
 **No API keys required. No external dependencies.**
 
 ### 4.2 Schema Summary
@@ -416,7 +416,7 @@ Used by Lead Qualifier:
 ### 6.3 Config Manager
 
 Used by all sub-skills. Merged into the database helper module — config is loaded and validated as part of database initialisation.
-- Load config from `$FREELANCE_FORGE_CONFIG_DIR/config.json` (env var with default `~/.freelance-forge/`)
+- Load config from `$WEBCLIENT_STUDIO_CONFIG_DIR/config.json` (env var with default `~/.webclient-studio/`)
 - Create with defaults if missing
 - Provide sensible defaults for missing optional fields
 - Support cross-platform paths via env vars
@@ -435,7 +435,7 @@ Templates are starting points, not rigid forms. The agent should adapt content b
 Used by all sub-skills:
 - Generate markdown report files with consistent structure
 - Include uncertainty sections in every analytical output
-- Save to `$FREELANCE_FORGE_CONFIG_DIR/reports/` (subdirectories for qualifications, proposals, projects)
+- Save to `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/` (subdirectories for qualifications, proposals, projects)
 - Return the file path so the agent can reference it in chat
 
 ---
@@ -445,7 +445,7 @@ Used by all sub-skills:
 ### 7.1 File Layout
 
 ```
-freelance-forge/
+webclient-studio/
 ├── openclaw.bundle.json          # Bundle manifest
 ├── openclaw-install.sh           # Install script
 ├── README.md                     # User-facing documentation
@@ -481,8 +481,8 @@ freelance-forge/
 
 ```json
 {
-  "name": "freelance-forge",
-  "displayName": "Freelance Forge — Lead to Launch",
+  "name": "webclient-studio",
+  "displayName": "WebClient Studio — Lead to Launch",
   "version": "1.0.0",
   "description": "Complete freelance web designer toolkit — qualify leads, generate proposals, onboard clients, and track your pipeline. Zero setup, runs locally.",
   "type": "bundle",
@@ -527,9 +527,9 @@ freelance-forge/
 The `openclaw-install.sh` script should:
 
 1. Copy each sub-skill's SKILL.md to the user's skills directory (standalone, discoverable)
-2. Copy shared scripts to a `freelance-forge/` directory within the skills folder
+2. Copy shared scripts to a `webclient-studio/` directory within the skills folder
 3. Copy reference files (templates, checklists) alongside the scripts
-4. Create `~/.freelance-forge/` directory and subdirectories if they don't exist
+4. Create `~/.webclient-studio/` directory and subdirectories if they don't exist
 5. Print a brief welcome message explaining what was installed and how to get started
 6. Do NOT create the database — that happens automatically on first use of any sub-skill
 7. Do NOT ask for credentials — no credentials are required
@@ -605,7 +605,7 @@ The `openclaw-install.sh` script should:
 - Shared scripts should handle graceful degradation (if database doesn't exist, create it; if config is missing, use defaults)
 - Keep database queries efficient — fetch what's needed, don't pull entire tables when a filtered query works
 - All user-facing output should be concise and actionable — freelancers are busy, they want the answer, not a wall of text
-- Error handling should suggest the fix, not just report the error ("Database not found at ~/.freelance-forge/pipeline.db. It will be created automatically on first use.")
+- Error handling should suggest the fix, not just report the error ("Database not found at ~/.webclient-studio/pipeline.db. It will be created automatically on first use.")
 - Every analytical output must include uncertainty flags — what the agent couldn't verify, what assumptions were made, what requires human confirmation (see §2.6)
 - Full reports are saved as files; database stores summaries and metadata only (see §2.7)
 - Email drafting means outputting text in the chat for the user to copy and send — no inbox integration, no email API, no OAuth
@@ -632,7 +632,7 @@ The `openclaw-install.sh` script should:
 - Draft-only email policy — chat output, no inbox integration (§2.4)
 - Honest uncertainty flagging in every analytical report (§2.6)
 - Reports as files, database as metadata (§2.7)
-- Cross-agent compatibility via env vars (only `FREELANCE_FORGE_CONFIG_DIR`)
+- Cross-agent compatibility via env vars (only `WEBCLIENT_STUDIO_CONFIG_DIR`)
 - The constraints and boundaries (§9)
 - The config file structure (see `storage.md` §4)
 - Each sub-skill working standalone after install

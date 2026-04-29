@@ -9,7 +9,7 @@
 
 ## Context
 
-Freelance Forge can export the pipeline as CSV (`db_helper export --format csv`). Rian wanted the reverse: import a CSV of leads into the pipeline. Use case is a freelancer switching from a spreadsheet, Trello, or another CRM who already has a list of companies/contacts.
+WebClient Studio can export the pipeline as CSV (`db_helper export --format csv`). Rian wanted the reverse: import a CSV of leads into the pipeline. Use case is a freelancer switching from a spreadsheet, Trello, or another CRM who already has a list of companies/contacts.
 
 ## Decision: Agent-driven import, no new Python code
 

@@ -21,21 +21,21 @@ Trigger phrases:
 ## Tools
 
 ```bash
-SHARED="${FREELANCE_FORGE_CONFIG_DIR:-$HOME/.freelance-forge}/shared"
+SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m templates render <path> --json '...'
 ```
 
 ### ⚠️ Path expansion in JSON arguments
 
-When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$FREELANCE_FORGE_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$WEBCLIENT_STUDIO_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
 
 ```bash
-# ❌ Wrong — $FREELANCE_FORGE_CONFIG_DIR is stored as a literal string
-python3 -m db_helper update-field <id> '{"path": "$FREELANCE_FORGE_CONFIG_DIR/reports/foo"}'
+# ❌ Wrong — $WEBCLIENT_STUDIO_CONFIG_DIR is stored as a literal string
+python3 -m db_helper update-field <id> '{"path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/foo"}'
 
 # ✅ Right — variable expands before JSON is built
-CLIENT_DIR="$FREELANCE_FORGE_CONFIG_DIR/reports/clients/acme"
+CLIENT_DIR="$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme"
 python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
 ```
 
@@ -46,12 +46,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before the flow below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '$HOME/.freelance-forge/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed to Flow.
 
-If it fails — read `~/.freelance-forge/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
+If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
 
 
 ## Flow
@@ -64,7 +64,7 @@ python3 -m db_helper get-lead --company "<client>"
 
 **No match?** Check for a qualification report:
 ```
-ls ~/.freelance-forge/reports/qualifications/*<client-slug>* 2>/dev/null
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<client-slug>* 2>/dev/null
 ```
 **If found:** Auto-add the lead to the pipeline (same flow as Proposal Builder Step 1 — create client folder, move report, store paths). Then proceed.
 **If not found:** Tell the user "No lead matching '<client>'. Run Lead Qualifier first or provide the company name." Offer to cancel.
@@ -81,8 +81,8 @@ Check the lead row for report paths:
 
 **If paths are null** (legacy lead from before client folders): Auto-migrate. Search for reports in the flat directories:
 ```
-ls ~/.freelance-forge/reports/qualifications/*<company-slug>* 2>/dev/null
-ls ~/.freelance-forge/reports/proposals/*<company-slug>* 2>/dev/null
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<company-slug>* 2>/dev/null
+ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/proposals/*<company-slug>* 2>/dev/null
 ```
 If any reports found: create the client folder, move them, and store the paths (same migration pattern as Proposal Builder Step 3). If none found: proceed without reports (they may have been deleted).
 
@@ -104,11 +104,11 @@ Check the lead row for `client_dir_path`:
 
 **If it is null** (lead was added before this feature): Create the folder:
 ```
-mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>"
+mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"
 ```
 Then store it:
 ```
-python3 -m db_helper update-field <lead-id> '{"client_dir_path": "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<client-slug>"}'
+python3 -m db_helper update-field <lead-id> '{"client_dir_path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"}'
 ```
 
 Do NOT create a separate `reports/projects/<slug>/` directory. All client files go into the client folder.
@@ -176,7 +176,7 @@ Use the template:
 ```
 python3 -m templates render onboarding-checklists/default.md \
     --json '{"company": "<name>", "service_type": "<type>"}' \
-    --out "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<slug>/onboarding-checklist.md"
+    --out "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<slug>/onboarding-checklist.md"
 ```
 
 The checklist has four sections (project-onboarder.md §6):
@@ -300,4 +300,4 @@ Output **in chat only**.
 Tell the user: project directory path, number of tasks created, lead status now `active`. Offer the optional welcome email.
 
 Example:
-> Created `~/.freelance-forge/reports/projects/acme-plumbing/` with project-brief.md, onboarding-checklist.md, sitemap.md. Added 9 tasks. Lead status updated to `active`. Want a welcome email draft for the client?
+> Created `~/.webclient-studio/reports/projects/acme-plumbing/` with project-brief.md, onboarding-checklist.md, sitemap.md. Added 9 tasks. Lead status updated to `active`. Want a welcome email draft for the client?

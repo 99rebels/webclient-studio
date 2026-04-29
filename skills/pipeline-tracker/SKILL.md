@@ -31,20 +31,20 @@ This skill does **not** create new leads through the normal qualification flow (
 ## Tools
 
 ```bash
-SHARED="${FREELANCE_FORGE_CONFIG_DIR:-$HOME/.freelance-forge}/shared"
+SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 ```
 
 ### ⚠️ Path expansion in JSON arguments
 
-When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$FREELANCE_FORGE_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$WEBCLIENT_STUDIO_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
 
 ```bash
-# ❌ Wrong — $FREELANCE_FORGE_CONFIG_DIR is stored as a literal string
-python3 -m db_helper update-field <id> '{"path": "$FREELANCE_FORGE_CONFIG_DIR/reports/foo"}'
+# ❌ Wrong — $WEBCLIENT_STUDIO_CONFIG_DIR is stored as a literal string
+python3 -m db_helper update-field <id> '{"path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/foo"}'
 
 # ✅ Right — variable expands before JSON is built
-CLIENT_DIR="$FREELANCE_FORGE_CONFIG_DIR/reports/clients/acme"
+CLIENT_DIR="$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme"
 python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
 ```
 
@@ -54,12 +54,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before any section below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '$HOME/.freelance-forge/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed.
 
-If it fails — read `~/.freelance-forge/references/setup.md` and execute the setup steps. Once setup completes, return here.
+If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here.
 
 ---
 
@@ -328,7 +328,7 @@ python3 -m db_helper export --format json
 python3 -m db_helper export --lead-id <id> --format json
 ```
 
-Writes to `$FREELANCE_FORGE_CONFIG_DIR/exports/`. The CLI prints the output path. Tell the user where it landed.
+Writes to `$WEBCLIENT_STUDIO_CONFIG_DIR/exports/`. The CLI prints the output path. Tell the user where it landed.
 
 CSV is for spreadsheet/Notion/Sheets import (one row per lead, tags pipe-separated). JSON is for backup or programmatic use (full lead bundle including tags, activity, tasks).
 
@@ -416,7 +416,7 @@ This two-step is only needed for non-default statuses. Most imports will just us
 
 ### Storage
 
-Copy the imported CSV to `~/.freelance-forge/imports/` (create directory if needed) with a timestamped filename: `<original-name>-<YYYY-MM-DD>.csv`. This provides an audit trail for which rows came from which file and when.
+Copy the imported CSV to "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/imports/" (create directory if needed) with a timestamped filename: `<original-name>-<YYYY-MM-DD>.csv`. This provides an audit trail for which rows came from which file and when.
 
 ### What NOT to do
 
@@ -463,5 +463,5 @@ Mostly a one-line confirmation. Examples:
 - After deep view: the full dossier. Offer relevant actions: "Want to update status, add a task, or draft a follow-up email?"
 - After status update: `Acme: qualified → proposal_sent.`
 - After tag: `Tagged Acme as 'urgent'.`
-- After export: `Exported 12 leads to ~/.freelance-forge/exports/pipeline-2026-04-26.csv.`
+- After export: `Exported 12 leads to ~/.webclient-studio/exports/pipeline-2026-04-26.csv.`
 - After follow-up logged: `Logged follow-up for Acme. Next stale check uses today as the anchor.`

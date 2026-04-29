@@ -1,4 +1,4 @@
-"""Database helper for Freelance Forge.
+"""Database helper for WebClient Studio.
 
 The only module that touches SQLite. All sub-skills go through this.
 
@@ -32,16 +32,16 @@ from typing import Any, Iterator
 # Path resolution
 # ---------------------------------------------------------------------------
 
-DEFAULT_CONFIG_DIR_NAME = ".freelance-forge"
+DEFAULT_CONFIG_DIR_NAME = ".webclient-studio"
 
 
 def get_config_dir() -> Path:
     """Resolve the config directory.
 
-    Honours $FREELANCE_FORGE_CONFIG_DIR; otherwise ~/.freelance-forge/.
+    Honours $WEBCLIENT_STUDIO_CONFIG_DIR; otherwise ~/.webclient-studio/.
     Creates the directory tree on first call.
     """
-    env = os.environ.get("FREELANCE_FORGE_CONFIG_DIR")
+    env = os.environ.get("WEBCLIENT_STUDIO_CONFIG_DIR")
     base = Path(env).expanduser() if env else Path.home() / DEFAULT_CONFIG_DIR_NAME
     for sub in ("reports/qualifications", "reports/proposals", "reports/projects", "reports/clients", "exports"):
         (base / sub).mkdir(parents=True, exist_ok=True)
@@ -51,9 +51,9 @@ def get_config_dir() -> Path:
 def get_shared_dir() -> Path:
     """Resolve the shared scripts directory.
 
-    Order: env var > ~/.freelance-forge/shared/ > this module's parent (dev).
+    Order: env var > ~/.webclient-studio/shared/ > this module's parent (dev).
     """
-    env = os.environ.get("FREELANCE_FORGE_SHARED_DIR")
+    env = os.environ.get("WEBCLIENT_STUDIO_SHARED_DIR")
     if env:
         return Path(env).expanduser()
     # Standard install: shared scripts live alongside the config
@@ -692,7 +692,7 @@ def find_tasks_by_name(lead_id: str, query: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def export_pipeline(format: str = "csv") -> Path:
-    """Export all leads (with tags) to ~/.freelance-forge/exports/pipeline-<date>.<ext>."""
+    """Export all leads (with tags) to ~/.webclient-studio/exports/pipeline-<date>.<ext>."""
     if format not in ("csv", "json"):
         raise ValueError("format must be 'csv' or 'json'")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

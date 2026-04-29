@@ -1,4 +1,4 @@
-# Freelance Forge — Lead to Launch
+# WebClient Studio — Lead to Launch
 
 A skill bundle for freelance web designers. Qualify leads, generate proposals, onboard clients, and track your pipeline — all through your AI agent.
 
@@ -18,6 +18,15 @@ A skill bundle for freelance web designers. Qualify leads, generate proposals, o
 Clone or download the bundle and place the four skill folders (`lead-qualifier`, `proposal-builder`, `project-onboarder`, `pipeline-tracker`) in your agent's skills directory. On first use, each skill detects the shared scripts and sets up automatically — no manual configuration needed.
 
 Optional: install Playwright + Chromium for better research on JS-rendered websites (`pip install playwright && playwright install chromium`). The Lead Qualifier works without it but produces lower-quality results on modern sites.
+### Cross-Agent Compatibility
+
+All paths resolve through the `WEBCLIENT_STUDIO_CONFIG_DIR` environment variable with a default fallback of `~/.webclient-studio/`. Agents can set this variable to customise the install location:
+
+```bash
+export WEBCLIENT_STUDIO_CONFIG_DIR=/path/to/your/preferred/dir
+```
+
+This works across OpenClaw, Claude Code, Codex CLI, Cursor, and any agent with file system access and shell support. If the variable is not set, everything defaults to `~/.webclient-studio/`.
 
 ## Quick Start
 
@@ -32,8 +41,8 @@ After install, try these in your agent:
 
 ## How It Works
 
-- **Local SQLite database** at `~/.freelance-forge/pipeline.db` — auto-created on first use
-- **Reports** saved as markdown files in `~/.freelance-forge/reports/`
+- **Local SQLite database** at `$WEBCLIENT_STUDIO_CONFIG_DIR/pipeline.db` (default: `~/.webclient-studio/pipeline.db`) — auto-created on first use
+- **Reports** saved as markdown files in `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/`
 - **No cloud services, no API keys, no subscriptions** — your data stays on your machine
 - **Export to CSV or JSON** anytime for Notion, Google Sheets, or backup
 
@@ -47,7 +56,7 @@ After install, try these in your agent:
 ## Directory Structure
 
 ```
-~/.freelance-forge/
+~/.webclient-studio/
 ├── pipeline.db          # Your pipeline database
 ├── config.json          # Your preferences
 ├── shared/              # Python modules (auto-installed)

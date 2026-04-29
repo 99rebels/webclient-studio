@@ -1,4 +1,4 @@
-# Freelance Forge — Design Philosophy
+# WebClient Studio — Design Philosophy
 
 **For:** Claude Code (implementation)
 **Date:** 2026-04-25
@@ -8,7 +8,7 @@
 
 ## The Core Mindset
 
-Freelance Forge is a tool that freelancers trust with their client relationships. A wrong company name, a hallucinated budget figure, or a fabricated website observation can damage a real business relationship. Every piece of output the agent produces will be read by the freelancer, and some of it will be seen by their clients. **The agent must never produce output that is confidently wrong.**
+WebClient Studio is a tool that freelancers trust with their client relationships. A wrong company name, a hallucinated budget figure, or a fabricated website observation can damage a real business relationship. Every piece of output the agent produces will be read by the freelancer, and some of it will be seen by their clients. **The agent must never produce output that is confidently wrong.**
 
 This is not a general AI safety concern — it's a product quality concern specific to this use case. Freelancers will use this tool to make business decisions. If the agent says "their website uses WordPress" and it actually uses Squarespace, the freelancer might base their entire pitch on a wrong assumption. That's worse than no information at all.
 

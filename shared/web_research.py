@@ -47,7 +47,7 @@ except ImportError:
 
 
 USER_AGENT = (
-    "Mozilla/5.0 (compatible; FreelanceForge/1.0; "
+    "Mozilla/5.0 (compatible; WebClientStudio/1.0; "
     "+https://github.com/anthropics/freelance-forge)"
 )
 

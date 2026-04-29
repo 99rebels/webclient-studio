@@ -1,4 +1,4 @@
-"""Freelance Forge — shared utilities for the skill bundle.
+"""WebClient Studio — shared utilities for the skill bundle.
 
 Public modules:
     db_helper      — SQLite CRUD, queries, activity log, export

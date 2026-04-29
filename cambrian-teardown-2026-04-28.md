@@ -1,4 +1,4 @@
-# Internal Teardown: Freelance Forge
+# Internal Teardown: WebClient Studio
 
 **Format:** Teardown (internal — not for publication)
 **Date:** 28 April 2026
@@ -64,7 +64,7 @@ Languages: Python (1,785 lines), Markdown (4,080 lines), no shell scripts.
 |---|---|
 | External network calls to unexpected hosts | None. web_research.py only connects to the URL the user provides. No telemetry, no phone-home. |
 | Credential access | None. No `.env` reading, no token access, no browser cookie access, no keychain access. |
-| File system scope | Confined to `~/.freelance-forge/` for data storage. Shared scripts read from the install location. No writes outside these boundaries. |
+| File system scope | Confined to `~/.webclient-studio/` for data storage. Shared scripts read from the install location. No writes outside these boundaries. |
 | Obfuscation | None. All code is plain, readable Python. |
 | Companion skill installation | None. No skill installs other skills or modifies the agent's configuration. |
 | SQL injection | Uses parameterised queries throughout db_helper.py. No raw SQL string interpolation. |
@@ -240,7 +240,7 @@ The Lead Qualifier produces rich structured data: tech stack, social links, cont
 - `data_confidence` (HIGH/MEDIUM/LOW)
 - `tags` (comma-separated in the tags table)
 
-The detailed findings (tech stack, social links, contacts, page-by-page analysis) are stored in the **qualification report file** (a markdown document at `~/.freelance-forge/reports/qualifications/...`), not in the database.
+The detailed findings (tech stack, social links, contacts, page-by-page analysis) are stored in the **qualification report file** (a markdown document at `~/.webclient-studio/reports/qualifications/...`), not in the database.
 
 The Proposal Builder reads from the database. Its SKILL.md says "Read automatically from database: Research notes (from Lead Qualifier), Lead score and assessment, Tags." But it doesn't read the qualification report file. The detailed findings from lead research (what CMS they use, what social profiles they have, what their website looks like) are not available to the Proposal Builder unless the agent independently reads the report file.
 
@@ -334,15 +334,15 @@ Without Playwright (using HTTP fallback only): **~5-8 minutes** total. But the L
 | **HoneyBook** (Starter) | $29/month ($348/year) | Monthly/Annual | CRM, proposals, contracts, invoicing, payments, client portal, templates, AI |
 | **Dubsado** (Starter) | $20/month ($200/year) | Monthly/Annual | CRM, proposals, contracts, invoicing, payments, scheduling, forms, workflows, time tracking |
 | **DIY (spreadsheets)** | $0 | — | Manual tracking, no automation, no templates, significant time cost |
-| **Freelance Forge** | **$19 one-time** | One-time | Lead research, qualification scoring, proposal templates, onboarding checklists, pipeline tracking |
+| **WebClient Studio** | **$19 one-time** | One-time | Lead research, qualification scoring, proposal templates, onboarding checklists, pipeline tracking |
 
 ### Fair pricing read
 
-The $19 price point is not competing with Bonsai or HoneyBook on feature parity. Those tools include invoicing, payment processing, contract signing, client portals, and scheduling — things Freelance Forge doesn't do at all. Freelance Forge competes with the **pre-build workflow** specifically: researching leads, scoring them, generating proposals, onboarding clients, and tracking the pipeline.
+The $19 price point is not competing with Bonsai or HoneyBook on feature parity. Those tools include invoicing, payment processing, contract signing, client portals, and scheduling — things WebClient Studio doesn't do at all. WebClient Studio competes with the **pre-build workflow** specifically: researching leads, scoring them, generating proposals, onboarding clients, and tracking the pipeline.
 
 Against the DIY baseline (spreadsheets + manual research), $19 one-time is very fair. A freelancer spending even 2 hours setting up a spreadsheet pipeline has already spent more than $19 of their time. The lead qualification feature alone (automated website research with tech stack detection and confidence scoring) would save most freelancers 15-30 minutes per lead.
 
-Against SaaS tools, the comparison is: Freelance Forge replaces the pre-build workflow for $19 total, while SaaS tools charge $19-29/month for a broader feature set. A freelancer paying for Bonsai AND using Freelance Forge would have overlapping proposal/pipeline features. But Freelance Forge works locally (no subscription, no data on someone else's server) and integrates directly with the freelancer's AI agent — something no SaaS tool does.
+Against SaaS tools, the comparison is: WebClient Studio replaces the pre-build workflow for $19 total, while SaaS tools charge $19-29/month for a broader feature set. A freelancer paying for Bonsai AND using WebClient Studio would have overlapping proposal/pipeline features. But WebClient Studio works locally (no subscription, no data on someone else's server) and integrates directly with the freelancer's AI agent — something no SaaS tool does.
 
 **Fair pricing verdict:** $19 is at the low end of fair, possibly underpriced. A freelancer who lands one additional client through better lead qualification has already gotten 10-50x return on $19.
 
@@ -417,9 +417,9 @@ I did NOT test the full agent-driven workflow (qualify a lead → generate a pro
 
 If this bundle clears the fix list, the Stack Play would write itself around these tensions:
 
-1. **$19 vs $19/month.** The pricing comparison is the obvious hook. Every freelancer tool is a subscription. Freelance Forge is one-time. But the comparison needs to be honest about what's missing (no invoicing, no payments, no contracts).
+1. **$19 vs $19/month.** The pricing comparison is the obvious hook. Every freelancer tool is a subscription. WebClient Studio is one-time. But the comparison needs to be honest about what's missing (no invoicing, no payments, no contracts).
 
-2. **AI-native vs SaaS-native.** Freelance Forge works through an AI agent, not a web dashboard. This is its real differentiator. The agent does the research, writes the proposals, manages the pipeline — the freelancer just talks to it. No SaaS tool offers this.
+2. **AI-native vs SaaS-native.** WebClient Studio works through an AI agent, not a web dashboard. This is its real differentiator. The agent does the research, writes the proposals, manages the pipeline — the freelancer just talks to it. No SaaS tool offers this.
 
 3. **Local-first vs cloud-first.** The data stays on the freelancer's machine. No account creation, no data on someone else's server, no vendor lock-in. This matters to freelancers who've been burned by SaaS price hikes or shutdowns.
 
