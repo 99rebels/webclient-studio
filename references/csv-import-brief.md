@@ -1,63 +1,62 @@
 # CSV Import Feature — Implementation Brief
 
-**Status:** Not yet implemented
+**Status:** Implemented (SKILL.md updates only — no Python changes)
 **Created:** 2026-04-28
+**Updated:** 2026-04-29
 **Author:** Cambrian (from conversation with Rian)
 
 ---
 
 ## Context
 
-Freelance Forge can export the pipeline as CSV (`db_helper export --format csv`). Rian wants the reverse: import a CSV of leads into the pipeline. Use case is a freelancer switching from a spreadsheet, Trello, or another CRM who already has a list of companies/contacts.
+Freelance Forge can export the pipeline as CSV (`db_helper export --format csv`). Rian wanted the reverse: import a CSV of leads into the pipeline. Use case is a freelancer switching from a spreadsheet, Trello, or another CRM who already has a list of companies/contacts.
 
 ## Decision: Agent-driven import, no new Python code
 
-The import flow should live in the **Pipeline Tracker** SKILL.md as a new section (§K). The agent reads the CSV, proposes a column mapping, previews the results, and calls the existing `add-lead` command for each row. No changes to `db_helper.py` needed.
+The import flow lives in the **Pipeline Tracker** SKILL.md as §K. The agent reads the CSV, proposes a column mapping, previews the results, and calls the existing `add-lead` command for each row. No changes to `db_helper.py` needed.
 
-## Design
+## Two-Phase Flow
 
-### Flow
+### Phase 1: Import (Pipeline Tracker §K)
+Bulk, fast data ingestion. Leads enter the pipeline with `imported` tag, `LOW` confidence, `lead` status. No research, no reports, no qualification — just data.
 
-1. **User provides CSV** — file path or drops the file
-2. **Agent reads headers + sample rows** (first 3-5 rows)
-3. **Agent proposes column mapping** — shows a table mapping their columns to our DB fields. Columns that don't match our schema are marked "skip". User confirms or adjusts.
-4. **Preview** — agent shows how a few rows will import (company, website, score, status — whatever was mapped). Flags any issues (missing required field "company", invalid score values, etc.)
-5. **User says go** — agent calls `add-lead` for each row
-6. **Summary** — "Imported 23 leads. 2 skipped (duplicates). 1 had invalid score (set to NULL)."
+### Phase 2: Enrich (Lead Qualifier — Enrichment Mode)
+On-demand, per-lead. When the user says "qualify [imported company]", the Lead Qualifier detects it already exists (via `imported` tag), runs full research, and **updates** the existing row instead of creating a new one. Creates client folder at this point, removes `imported` tag, bumps confidence/score based on actual research.
 
-### Rules
+The assumption: if someone manually imported a company, they already want to work with them. Qualification verifies that decision.
 
-- **Only import columns that map to existing DB fields.** No new columns created. If their CSV has a "Revenue" column and we don't have one, it gets skipped (or optionally mapped to `research_notes` as context if the user wants).
-- **Existing DB fields** (the only valid targets): `company`, `website`, `contact_name`, `contact_email`, `status`, `lead_score`, `data_confidence`, `research_notes`, `pitch_notes`, `tags`
-- **Required field:** `company` — if a row has no company name, skip it and flag
-- **Defaults for unmapped fields:**
-  - `status` → `"lead"`
-  - `lead_score` → `NULL` (don't import arbitrary scores without validation)
-  - `data_confidence` → `"LOW"` (imported data hasn't been verified by us)
-  - `tags` → `"imported"` (so imported leads are always identifiable)
-- **Duplicate check:** Before each `add-lead`, run `get-lead --company` — if it exists, skip and flag
-- **Validation:** Scores must be 1-10 integers or NULL. URLs should look like URLs. Statuses must match our valid status list.
-- **Cap:** Suggest importing max 50 rows per batch to avoid token burn. If more, offer to process in batches.
-- **Activity log:** Each imported lead gets `lead_imported` in the activity log with the source file name
+## What was implemented
 
-### What NOT to do
+### Pipeline Tracker (`skills/pipeline-tracker/SKILL.md`)
+- Added §K Import section
+- Added trigger phrases to routing table ("import CSV", "import leads", "upload spreadsheet")
+- Full flow: read CSV → show headers + sample → propose mapping → preview 3-5 rows → user confirms → import row-by-row → summary
 
-- No auto-import without user confirming the mapping
-- No guessing values for unmapped columns
-- No importing score values without validating they're 1-10
-- No overwriting existing leads silently
-- No creating new database columns to match their CSV
+### Lead Qualifier (`skills/lead-qualifier/SKILL.md`)
+- Modified Step 2 (duplicate check) to detect `imported` tag
+- Added Enrichment Mode: when an imported lead is qualified, update existing row instead of creating new
+- Client folder created during enrichment, not during import
+- Removes `imported` tag after successful qualification
 
-### Storage
+### Cleanup
+- Deleted `subskills/` directory (stale v0.3 design docs, pre-bundle format)
 
-Save imported CSVs to `~/.freelance-forge/imports/` so they can be referenced later (which rows came from which file, when).
+## Design decisions
 
-## Implementation steps
-
-1. Add §K Import section to `skills/pipeline-tracker/SKILL.md`
-2. Add trigger phrases to the routing table in Pipeline Tracker ("import CSV", "import leads", "upload spreadsheet")
-3. Pull request and push to GitHub
+| Decision | Rationale |
+|---|---|
+| Agent-driven, no Python | Agent's fuzzy matching better than rigid import script |
+| Human-in-the-loop at mapping step | Prevents garbage data from wrong column mappings |
+| Preview 3-5 rows, not all | Avoids token burn on large imports |
+| Encoding fallback (latin-1/cp1252) | Excel on Windows often exports non-UTF-8 CSVs |
+| `data_confidence → LOW` for imports | Marks data as unverified without creating second-class status |
+| `tags → imported` | Filterable, removable after qualification |
+| Don't dump skip columns into notes | Prevents noise; only on explicit user request |
+| Batch cap of 50 rows | Token management |
+| No "add to pipeline?" for enrichment | Import implies intent; qualification verifies it |
+| CSV-only (no .xlsx yet) | Right scope for v1; Excel support noted as future |
+| Imported CSVs saved to `imports/` | Audit trail for source files |
 
 ## No Python changes needed
 
-This entire feature is a SKILL.md update. The agent does the CSV parsing, column matching, and row-by-row insertion using existing `db_helper` commands. The agent's natural language understanding is better at fuzzy column matching than a rigid Python import script anyway.
+This entire feature is SKILL.md updates. The agent does CSV parsing, column matching, and row-by-row insertion using existing `db_helper` commands.

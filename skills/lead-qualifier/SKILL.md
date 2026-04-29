@@ -61,11 +61,38 @@ If it fails — read `~/.freelance-forge/references/setup.md` and execute the se
 - If only a name, search for the official website. Confirm the candidate URL with the user before proceeding (one line is fine: *"I found acmeplumbing.ie — is that the one?"*).
 - If nothing findable, ask the user. Do not invent a URL.
 
-### 2. Check for duplicates
+### 2. Check for existing leads
 ```
 python3 -m db_helper get-lead --company "<company name>"
+python3 -m db_helper tag list --lead-id <id>   # if match found, check tags
 ```
-If one or more matches return, present them and ask: *"Acme Plumbing already exists (status: qualified, score: 7). Update the existing entry, or create a new one?"* Don't silently overwrite.
+
+**If no match:** proceed to Step 3 (normal flow).
+
+**If a match exists with the `imported` tag:** this is an imported lead being enriched. Switch to **Enrichment Mode** (see below).
+
+**If a match exists without the `imported` tag:** present the existing entry and ask: *"Acme Plumbing already exists (status: qualified, score: 7). Update the existing entry, or create a new one?"* Don't silently overwrite.
+
+#### Enrichment Mode (imported leads)
+
+Imported leads are already in the pipeline — the user decided they want to work with them when they ran the CSV import. The qualification step is *verifying* that decision, not deciding whether to add them.
+
+1. Run Steps 3–6 as normal (fetch, crawl, score, write report).
+2. **Create the client folder** (it wasn't created during import):
+   ```bash
+   mkdir -p "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>"
+   mv "$FREELANCE_FORGE_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md" \
+      "$FREELANCE_FORGE_CONFIG_DIR/reports/clients/<company-slug>/"
+   ```
+3. **Update the existing row** instead of creating a new one:
+   ```bash
+   python3 -m db_helper update-field <lead-id> '{"lead_score": <score>, "data_confidence": "<confidence>", "research_notes": "<summary>", "pitch_notes": "<pros/cons>", "website": "<URL>"}'
+   python3 -m db_helper update-field <lead-id> '{"client_dir_path": "<path>", "qualification_report_path": "<path>"}'
+   ```
+4. **Remove the `imported` tag:** `python3 -m db_helper tag remove --lead-id <id> --name imported`
+5. **Add any new tags** from the qualification research (wordpress, local-business, etc.).
+6. The shim auto-logs the updates. No "add to pipeline?" question — the lead is already there.
+7. Tell the user: *"Acme Plumbing updated: score NULL → 7, confidence LOW → HIGH. Imported tag removed — this lead is now fully qualified."* Offer the email draft as usual.
 
 ### 3. Fetch and crawl
 ```

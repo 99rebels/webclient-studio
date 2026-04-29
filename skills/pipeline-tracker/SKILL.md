@@ -23,9 +23,10 @@ The Pipeline Tracker handles a wide range of intents. Route based on what the us
 | "find leads matching <query>" / "search for <x>" | §G Search |
 | "show <client>'s tasks" / "mark <task> done" / "add task" / "what's left to do?" | §H Tasks |
 | "how many leads this month?" / "conversion rate" | §I Stats |
+| "import CSV" / "import leads" / "upload spreadsheet" / "import from file" | §K Import |
 | "export my pipeline" / "export to CSV / JSON" | §J Export |
 
-This skill does **not** create new leads (Lead Qualifier does) and does **not** create the initial onboarding task set (Project Onboarder does). It manages everything day-to-day after.
+This skill does **not** create new leads through the normal qualification flow (Lead Qualifier does), but **does** create leads via CSV import (§K). It does **not** create the initial onboarding task set (Project Onboarder does). It manages everything day-to-day after.
 
 ## Tools
 
@@ -332,6 +333,96 @@ Writes to `$FREELANCE_FORGE_CONFIG_DIR/exports/`. The CLI prints the output path
 CSV is for spreadsheet/Notion/Sheets import (one row per lead, tags pipe-separated). JSON is for backup or programmatic use (full lead bundle including tags, activity, tasks).
 
 Confirmation is **not** required for export — it's a read-only operation on the user's own data.
+
+---
+
+## §K. Import
+
+Import leads from a CSV file into the pipeline. This is a two-phase flow:
+
+- **Phase 1 (here):** Bulk import — add leads to pipeline with `imported` tag, `LOW` confidence, `lead` status. Fast, no research.
+- **Phase 2 (Lead Qualifier):** On-demand enrichment — when the user says "qualify [imported company]", the Lead Qualifier detects it already exists, runs research, and updates the existing row instead of creating a new one.
+
+Import is a special case of lead creation — external data the user already decided they want in their pipeline. It's not the normal qualify-then-add flow.
+
+### Trigger phrases
+
+"import CSV", "import leads", "upload spreadsheet", "import from file", "I have a list of companies"
+
+### Flow
+
+**1. User provides CSV** — file path or drops the file.
+
+**2. Read the file.** Use the `csv` module via a one-liner or read directly. If the file contains garbled characters (mojibake), re-read with `encoding='latin-1'` or `'cp1252'` — CSVs exported from Excel on Windows often use these encodings instead of UTF-8.
+
+**3. Show headers + sample.** Display all column headers and the first 3–5 rows so the user can see what they're working with.
+
+**4. Propose column mapping.** Show a mapping table: their CSV columns → our DB fields. Columns that don't match our schema are marked "skip".
+
+Valid target fields: `company`, `website`, `contact_name`, `contact_email`, `status`, `lead_score`, `data_confidence`, `research_notes`, `pitch_notes`, `tags`
+
+**5. Preview.** Show how 3–5 representative rows will import (company, website, score, status — whatever was mapped). Separately flag any rows with issues (missing required field, invalid score, malformed URL).
+
+**6. User confirms.** Wait for explicit go-ahead. No auto-import.
+
+**7. Import row by row.** For each row:
+
+```bash
+python3 -m db_helper get-lead --company "<company>"
+```
+
+- If it exists → skip and flag as duplicate
+- If it doesn't exist →
+
+```bash
+python3 -m db_helper add-lead "<Company Name>" \
+    --website "<URL>" \
+    --contact-name "<name>" \
+    --contact-email "<email>" \
+    --lead-score <score or omit if NULL> \
+    --data-confidence LOW \
+    --status lead \
+    --tags "imported" \
+    --research-notes "Imported from <filename> on <date>"
+```
+
+Only include flags for fields that were mapped. Omit unmapped fields entirely (let db_helper defaults apply).
+
+**8. Summary.** Report total imported, skipped (duplicates), and any issues.
+
+### Rules
+
+- **Required field:** `company` — skip and flag any row without it
+- **Defaults for unmapped fields:**
+  - `status` → `lead`
+  - `lead_score` → `NULL` (don't import arbitrary scores without validation)
+  - `data_confidence` → `LOW` (imported data hasn't been verified)
+  - `tags` → `imported` (always identifiable as CSV-sourced)
+- **Validation:**
+  - Scores must be integers 1–10 or NULL. Reject anything else.
+  - URLs should look like URLs (`http://` or `https://`). Reject obvious non-URLs.
+  - Statuses must match the valid status list. Reject unknown statuses.
+- **Batch cap:** Max 50 rows per batch. If the CSV has more, offer to process in batches.
+- **Skip columns:** Columns that don't map to our schema are silently skipped. Do NOT dump them into `research_notes` unless the user explicitly asks to preserve extra context.
+- **Duplicate check:** Before each `add-lead`, check for existing company. Skip and flag duplicates — never overwrite silently.
+- **Activity log:** Each imported lead gets `lead_imported` logged with the source filename.
+
+### Storage
+
+Copy the imported CSV to `~/.freelance-forge/imports/` (create directory if needed) with a timestamped filename: `<original-name>-<YYYY-MM-DD>.csv`. This provides an audit trail for which rows came from which file and when.
+
+### What NOT to do
+
+- No auto-import without user confirming the mapping
+- No guessing values for unmapped columns
+- No importing score values without validating they're 1–10
+- No overwriting existing leads silently
+- No creating new database columns to match their CSV
+- No dumping unmapped columns into notes unless explicitly asked
+
+### Future: Excel (.xlsx) support
+
+Some users' "spreadsheet" is an Excel file. CSV-only is the current scope. If a user provides an `.xlsx` file, ask them to export as CSV first. Excel import is a candidate for a future enhancement.
 
 ---
 
