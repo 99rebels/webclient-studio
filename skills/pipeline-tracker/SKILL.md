@@ -31,7 +31,7 @@ This skill does **not** create new leads through the normal qualification flow (
 ## Tools
 
 ```bash
-SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
+SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 ```
 
@@ -54,12 +54,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before any section below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys,os; os.environ.get('WEBCLIENT_STUDIO_CONFIG_DIR') or exit(1); sys.path.insert(0, os.environ['WEBCLIENT_STUDIO_CONFIG_DIR']+'/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed.
 
-If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here.
+If it fails — read `references/setup.md` from the bundle source and execute the setup steps. Once setup completes, return here.
 
 ---
 
@@ -416,7 +416,7 @@ This two-step is only needed for non-default statuses. Most imports will just us
 
 ### Storage
 
-Copy the imported CSV to "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/imports/" (create directory if needed) with a timestamped filename: `<original-name>-<YYYY-MM-DD>.csv`. This provides an audit trail for which rows came from which file and when.
+Copy the imported CSV to `$WEBCLIENT_STUDIO_CONFIG_DIR/imports/` (create directory if needed) with a timestamped filename: `<original-name>-<YYYY-MM-DD>.csv`. This provides an audit trail for which rows came from which file and when.
 
 ### What NOT to do
 
@@ -463,5 +463,5 @@ Mostly a one-line confirmation. Examples:
 - After deep view: the full dossier. Offer relevant actions: "Want to update status, add a task, or draft a follow-up email?"
 - After status update: `Acme: qualified → proposal_sent.`
 - After tag: `Tagged Acme as 'urgent'.`
-- After export: `Exported 12 leads to ~/.webclient-studio/exports/pipeline-2026-04-26.csv.`
+- After export: `Exported 12 leads to $WEBCLIENT_STUDIO_CONFIG_DIR/exports/pipeline-2026-04-26.csv.`
 - After follow-up logged: `Logged follow-up for Acme. Next stale check uses today as the anchor.`

@@ -82,14 +82,16 @@ def render_string(template: str, context: dict[str, Any]) -> str:
 def _references_search_paths() -> list[Path]:
     """Where to look for templates when given a relative path.
 
-    Order: env var > ~/.webclient-studio/references/ > sibling references/ > inside this module's dir.
+    Order: $WEBCLIENT_STUDIO_REFERENCES_DIR (if set) > $WEBCLIENT_STUDIO_CONFIG_DIR/references/ > sibling references/ > inside this module's dir.
     """
     paths: list[Path] = []
     env = os.environ.get("WEBCLIENT_STUDIO_REFERENCES_DIR")
     if env:
         paths.append(Path(env).expanduser())
-    # ~/.webclient-studio/references/ — the standard install location
-    paths.append(Path.home() / ".webclient-studio" / "references")
+    # Standard install: references live in the configured data directory
+    config_dir = os.environ.get("WEBCLIENT_STUDIO_CONFIG_DIR")
+    if config_dir:
+        paths.append(Path(config_dir).expanduser() / "references")
     # Source-repo layout (for development)
     here = Path(__file__).resolve().parent
     paths.append(here.parent / "references")

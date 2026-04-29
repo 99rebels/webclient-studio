@@ -20,13 +20,14 @@ Clone or download the bundle and place the four skill folders (`lead-qualifier`,
 Optional: install Playwright + Chromium for better research on JS-rendered websites (`pip install playwright && playwright install chromium`). The Lead Qualifier works without it but produces lower-quality results on modern sites.
 ### Cross-Agent Compatibility
 
-All paths resolve through the `WEBCLIENT_STUDIO_CONFIG_DIR` environment variable with a default fallback of `~/.webclient-studio/`. Agents can set this variable to customise the install location:
+All paths resolve through the `WEBCLIENT_STUDIO_CONFIG_DIR` environment variable. On first use, the agent asks where to store data, configures the env var automatically, and persists it to your shell config — no manual configuration needed.
 
 ```bash
+# Set automatically by the agent during setup — you don't need to do this manually
 export WEBCLIENT_STUDIO_CONFIG_DIR=/path/to/your/preferred/dir
 ```
 
-This works across OpenClaw, Claude Code, Codex CLI, Cursor, and any agent with file system access and shell support. If the variable is not set, everything defaults to `~/.webclient-studio/`.
+This works across OpenClaw, Claude Code, Codex CLI, Cursor, and any agent with file system access and shell support.
 
 ## Quick Start
 
@@ -41,7 +42,7 @@ After install, try these in your agent:
 
 ## How It Works
 
-- **Local SQLite database** at `$WEBCLIENT_STUDIO_CONFIG_DIR/pipeline.db` (default: `~/.webclient-studio/pipeline.db`) — auto-created on first use
+- **Local SQLite database** at `$WEBCLIENT_STUDIO_CONFIG_DIR/pipeline.db` — auto-created on first use
 - **Reports** saved as markdown files in `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/`
 - **No cloud services, no API keys, no subscriptions** — your data stays on your machine
 - **Export to CSV or JSON** anytime for Notion, Google Sheets, or backup
@@ -56,7 +57,7 @@ After install, try these in your agent:
 ## Directory Structure
 
 ```
-~/.webclient-studio/
+$WEBCLIENT_STUDIO_CONFIG_DIR/
 ├── pipeline.db          # Your pipeline database
 ├── config.json          # Your preferences
 ├── shared/              # Python modules (auto-installed)
@@ -64,7 +65,8 @@ After install, try these in your agent:
 ├── reports/
 │   ├── qualifications/  # Lead qualification reports
 │   ├── proposals/       # Proposal documents
-│   └── projects/        # Project briefs, checklists, sitemaps
+│   ├── projects/        # Project briefs, checklists, sitemaps
+│   └── clients/         # Per-client folders (all reports for a client)
 └── exports/             # CSV/JSON exports
 ```
 

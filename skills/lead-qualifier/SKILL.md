@@ -20,10 +20,10 @@ If the user mentions a company by name *without* a URL, find the website first (
 
 ## Tools
 
-This skill uses CLI shims from the bundle's shared scripts. The shared scripts live at `$WEBCLIENT_STUDIO_CONFIG_DIR/shared/` (default: `~/.webclient-studio/shared/`). Run shims with that directory on `PYTHONPATH`:
+This skill uses CLI shims from the bundle's shared scripts. The shared scripts live at `$WEBCLIENT_STUDIO_CONFIG_DIR/shared/`. Run shims with that directory on `PYTHONPATH`:
 
 ```bash
-SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
+SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m web_research <url>
 ```
@@ -47,12 +47,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before the flow below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys,os; os.environ.get('WEBCLIENT_STUDIO_CONFIG_DIR') or exit(1); sys.path.insert(0, os.environ['WEBCLIENT_STUDIO_CONFIG_DIR']+'/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed to Flow.
 
-If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
+If it fails — read `references/setup.md` from the bundle source and execute the setup steps. Once setup completes, return here and proceed with the Flow.
 
 ## Flow
 
@@ -147,7 +147,6 @@ Save to:
 ```
 $WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md
 ```
-(default: `~/.webclient-studio/reports/qualifications/...`)
 
 **Keep this flat location for the initial save.** When the freelancer adds the lead to the pipeline (Step 7a), the report is moved to the client folder. This two-step process means the report exists even if the freelancer decides not to add the lead.
 
@@ -275,11 +274,11 @@ If it returns results: tell the user "[Company] is already in your pipeline (sta
 
 2. **Check for a qualification report:**
 ```bash
-ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<company-slug>* 2>/dev/null
+ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<company-slug>* 2>/dev/null
 ```
 Also check the client folder in case the report was already moved:
 ```bash
-ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/clients/<company-slug>/qualification* 2>/dev/null
+ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/clients/<company-slug>/qualification* 2>/dev/null
 ```
 If a report exists: read it, extract score + data confidence + compose research_notes from the report content, then run the `add-lead` command from Step 7a (including creating the client folder and moving the report).
 
@@ -354,4 +353,4 @@ These come directly from `design-philosophy.md`. Every report must comply.
 Examples:
 > Added Acme Plumbing to pipeline (score 7/10, tags: wordpress, local-business). Want a first-contact email draft?
 
-> Report saved at `~/.webclient-studio/reports/qualifications/acme-plumbing-2026-04-26.md`. You can add it to the pipeline anytime — just say "add Acme Plumbing" and I'll pull from the report.
+> Report saved at `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/acme-plumbing-2026-04-26.md`. You can add it to the pipeline anytime — just say "add Acme Plumbing" and I'll pull from the report.

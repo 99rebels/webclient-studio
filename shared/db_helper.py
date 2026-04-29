@@ -38,11 +38,18 @@ DEFAULT_CONFIG_DIR_NAME = ".webclient-studio"
 def get_config_dir() -> Path:
     """Resolve the config directory.
 
-    Honours $WEBCLIENT_STUDIO_CONFIG_DIR; otherwise ~/.webclient-studio/.
+    Requires $WEBCLIENT_STUDIO_CONFIG_DIR to be set (configured by setup).
+    Raises RuntimeError if not set — the user needs to run setup first.
     Creates the directory tree on first call.
     """
     env = os.environ.get("WEBCLIENT_STUDIO_CONFIG_DIR")
-    base = Path(env).expanduser() if env else Path.home() / DEFAULT_CONFIG_DIR_NAME
+    if not env:
+        raise RuntimeError(
+            "WEBCLIENT_STUDIO_CONFIG_DIR is not set. "
+            "Run the WebClient Studio setup first. "
+            "See references/setup.md in the bundle for instructions."
+        )
+    base = Path(env).expanduser()
     for sub in ("reports/qualifications", "reports/proposals", "reports/projects", "reports/clients", "exports"):
         (base / sub).mkdir(parents=True, exist_ok=True)
     return base
@@ -51,7 +58,7 @@ def get_config_dir() -> Path:
 def get_shared_dir() -> Path:
     """Resolve the shared scripts directory.
 
-    Order: env var > ~/.webclient-studio/shared/ > this module's parent (dev).
+    Order: $WEBCLIENT_STUDIO_SHARED_DIR (if set) > $WEBCLIENT_STUDIO_CONFIG_DIR/shared/ > this module's parent (dev).
     """
     env = os.environ.get("WEBCLIENT_STUDIO_SHARED_DIR")
     if env:
@@ -692,7 +699,7 @@ def find_tasks_by_name(lead_id: str, query: str) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 def export_pipeline(format: str = "csv") -> Path:
-    """Export all leads (with tags) to ~/.webclient-studio/exports/pipeline-<date>.<ext>."""
+    """Export all leads (with tags) to $WEBCLIENT_STUDIO_CONFIG_DIR/exports/pipeline-<date>.<ext>."""
     if format not in ("csv", "json"):
         raise ValueError("format must be 'csv' or 'json'")
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")

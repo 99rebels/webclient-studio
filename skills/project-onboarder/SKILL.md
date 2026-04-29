@@ -21,7 +21,7 @@ Trigger phrases:
 ## Tools
 
 ```bash
-SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
+SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m templates render <path> --json '...'
 ```
@@ -46,12 +46,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before the flow below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys,os; os.environ.get('WEBCLIENT_STUDIO_CONFIG_DIR') or exit(1); sys.path.insert(0, os.environ['WEBCLIENT_STUDIO_CONFIG_DIR']+'/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed to Flow.
 
-If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
+If it fails — read `references/setup.md` from the bundle source and execute the setup steps. Once setup completes, return here and proceed with the Flow.
 
 
 ## Flow
@@ -64,7 +64,7 @@ python3 -m db_helper get-lead --company "<client>"
 
 **No match?** Check for a qualification report:
 ```
-ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<client-slug>* 2>/dev/null
+ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<client-slug>* 2>/dev/null
 ```
 **If found:** Auto-add the lead to the pipeline (same flow as Proposal Builder Step 1 — create client folder, move report, store paths). Then proceed.
 **If not found:** Tell the user "No lead matching '<client>'. Run Lead Qualifier first or provide the company name." Offer to cancel.
@@ -81,8 +81,8 @@ Check the lead row for report paths:
 
 **If paths are null** (legacy lead from before client folders): Auto-migrate. Search for reports in the flat directories:
 ```
-ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<company-slug>* 2>/dev/null
-ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/proposals/*<company-slug>* 2>/dev/null
+ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<company-slug>* 2>/dev/null
+ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/proposals/*<company-slug>* 2>/dev/null
 ```
 If any reports found: create the client folder, move them, and store the paths (same migration pattern as Proposal Builder Step 3). If none found: proceed without reports (they may have been deleted).
 
@@ -300,4 +300,4 @@ Output **in chat only**.
 Tell the user: project directory path, number of tasks created, lead status now `active`. Offer the optional welcome email.
 
 Example:
-> Created `~/.webclient-studio/reports/projects/acme-plumbing/` with project-brief.md, onboarding-checklist.md, sitemap.md. Added 9 tasks. Lead status updated to `active`. Want a welcome email draft for the client?
+> Created `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme-plumbing/` with project-brief.md, onboarding-checklist.md, sitemap.md. Added 9 tasks. Lead status updated to `active`. Want a welcome email draft for the client?

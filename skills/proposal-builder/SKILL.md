@@ -20,7 +20,7 @@ Trigger phrases:
 ## Tools
 
 ```bash
-SHARED="${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared"
+SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m templates render <path> --json '...'
 ```
@@ -46,12 +46,12 @@ This matters because the database stores paths that are later read by other skil
 
 Before the flow below, run the guard clause:
 ```bash
-python3 -c "import sys; sys.path.insert(0, '${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/shared'); import db_helper" 2>/dev/null && echo OK
+python3 -c "import sys,os; os.environ.get('WEBCLIENT_STUDIO_CONFIG_DIR') or exit(1); sys.path.insert(0, os.environ['WEBCLIENT_STUDIO_CONFIG_DIR']+'/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
 If `OK` — proceed to Flow.
 
-If it fails — read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` and execute the setup steps. Once setup completes, return here and proceed with the Flow.
+If it fails — read `references/setup.md` from the bundle source and execute the setup steps. Once setup completes, return here and proceed with the Flow.
 
 
 ## Flow
@@ -70,7 +70,7 @@ Three paths:
 - **No match** → check for a qualification report before asking:
 
 ```
-ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<client-slug>* 2>/dev/null
+ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<client-slug>* 2>/dev/null
 ```
 
 **If a qualification report exists:** The freelancer already qualified this lead but hasn't added it to the pipeline yet. Auto-add it silently — extract the score, data confidence, and summary from the report, create the client folder, move the report, and store the paths. Then continue to Step 2.
@@ -78,7 +78,7 @@ ls "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualificati
 ```
 # Create client folder and move report
 mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"
-mv "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}"/reports/qualifications/*<client-slug>* "${WEBCLIENT_STUDIO_CONFIG_DIR:-$HOME/.webclient-studio}/reports/clients/<client-slug>/"
+mv "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<client-slug>* "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/clients/<client-slug>/"
 
 # Add to pipeline with report paths
 python3 -m db_helper add-lead "<Company Name>" \
@@ -241,4 +241,4 @@ If yes, output **in chat only**. Rules (proposal-builder.md §8):
 Tell the user: file path, status now `proposal_sent`, summary of what was included, any `[Confirm with client: ...]` placeholders left in the document. Offer the optional covering email.
 
 Example:
-> Wrote `~/.webclient-studio/reports/proposals/acme-plumbing-2026-04-26.md`. Status updated to `proposal_sent`. The proposal has 2 placeholders to confirm with the client (booking system features, content delivery deadline). Want a covering email draft?
+> Wrote `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme-plumbing/acme-plumbing-2026-04-26-proposal.md`. Status updated to `proposal_sent`. The proposal has 2 placeholders to confirm with the client (booking system features, content delivery deadline). Want a covering email draft?
