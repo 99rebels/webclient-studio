@@ -3,24 +3,28 @@ name: lead-qualifier
 description: Research and score a prospective freelance web design client. Use when the user asks to qualify a lead, research a company, score a prospect, or check out a company at a URL. Produces a markdown qualification report and writes a summary row to the local pipeline database.
 ---
 
-# Lead Qualifier
+# 🔍 Lead Qualifier
 
-Research a prospective client, score them 1–10 as a fit for a freelance web designer, write an honest qualification report, and store a summary row in the pipeline database. This skill is the entry point of the WebClient Studio pipeline — every later skill (proposal, onboarding, tracking) reads what this skill writes.
+Research a prospective client, score them 1–10, write an honest qualification report, and store a summary row in the pipeline database. This is the **entry point** of the WebClient Studio pipeline — every later skill (proposal, onboarding, tracking) reads what this skill writes.
 
-## When to use this skill
+## Why
 
-Trigger phrases the user might say:
+Freelance web designers waste hours researching leads that go nowhere. This skill crawls the prospect's site, extracts what matters, scores the fit, writes a report, and stores it in the pipeline so every downstream skill can use it.
+
+## When to use
+
 - "qualify this lead: <company or URL>"
 - "research this company: <company or URL>"
 - "score this prospect"
 - "check out <company> for me"
 - "I got an email from <company> — should I pursue this?"
+- "add [company] to my pipeline" → jump to **Add from existing report** (below)
 
-If the user mentions a company by name *without* a URL, find the website first (web search). If you cannot find a website, ask the user for one or for a LinkedIn page. **Never proceed blind.**
+If the user gives a name without a URL, find the website first. **Never proceed without a URL or LinkedIn.**
 
-## Tools
+## ⚡ Tools
 
-This skill uses CLI shims from the bundle's shared scripts. The shared scripts live at `$WEBCLIENT_STUDIO_CONFIG_DIR/shared/`. Run shims with that directory on `PYTHONPATH`:
+This skill uses the bundle's shared Python modules. Set `SHARED` to the shared scripts directory:
 
 ```bash
 SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"
@@ -28,12 +32,10 @@ PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m web_research <url>
 ```
 
-### ⚠️ Path expansion in JSON arguments
-
-When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$WEBCLIENT_STUDIO_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+**⚠️ Path expansion in JSON:** The shell does not expand variables inside single quotes. Always expand paths before inserting into JSON:
 
 ```bash
-# ❌ Wrong — $WEBCLIENT_STUDIO_CONFIG_DIR is stored as a literal string
+# ❌ Wrong — $VAR stored as literal string
 python3 -m db_helper update-field <id> '{"path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/foo"}'
 
 # ✅ Right — variable expands before JSON is built
@@ -41,116 +43,113 @@ CLIENT_DIR="$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme"
 python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
 ```
 
-This matters because the database stores paths that are later read by other skills. A literal `$HOME` works for the current user but will not resolve correctly in all contexts.
+## Guard clause
 
-## First Run Check
+Before the flow, run:
 
-Before the flow below, run the guard clause:
 ```bash
 python3 -c "import sys,os; os.environ.get('WEBCLIENT_STUDIO_CONFIG_DIR') or exit(1); sys.path.insert(0, os.environ['WEBCLIENT_STUDIO_CONFIG_DIR']+'/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
-If `OK` — proceed to Flow.
+- **OK** → set `SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"` and proceed to Flow. All `python3 -m` commands in the flow assume `PYTHONPATH="$SHARED"` is set.
+- **Fails** → read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` (or the bundle's `references/setup.md`), execute setup, then return here.
 
-If it fails — read `references/setup.md` from the bundle source and execute the setup steps. Once setup completes, return here and proceed with the Flow.
+## 🔄 Flow
 
-## Flow
+### 1. Resolve to a website
 
-### 1. Resolve the company to a website
-- If the user gave a URL, use it.
-- If only a name, search for the official website. Confirm the candidate URL with the user before proceeding (one line is fine: *"I found acmeplumbing.ie — is that the one?"*).
-- If nothing findable, ask the user. Do not invent a URL.
+Use the URL if provided. If only a name, search for the official site and confirm: *"I found acmeplumbing.ie — is that the one?"*
+
+If nothing findable, ask the user. Do not invent a URL.
 
 ### 2. Check for existing leads
-```
+
+```bash
 python3 -m db_helper get-lead --company "<company name>"
-python3 -m db_helper tag list --lead-id <id>   # if match found, check tags
+python3 -m db_helper tag list --lead-id <id>   # if match found
 ```
 
-**If no match:** proceed to Step 3 (normal flow).
-
-**If a match exists with the `imported` tag:** this is an imported lead being enriched. Switch to **Enrichment Mode** (see below).
-
-**If a match exists without the `imported` tag:** present the existing entry and ask: *"Acme Plumbing already exists (status: qualified, score: 7). Update the existing entry, or create a new one?"* Don't silently overwrite.
+| Match | Action |
+|---|---|
+| No match | Proceed to Step 3 (normal flow) |
+| Match with `imported` tag | Switch to **Enrichment Mode** (below) |
+| Match without `imported` tag | If status is `lead` (no qualification yet): run Steps 3–6 (fetch, score, write report). Then create the client folder, move the report, update the existing row with all fields including paths, and set status to `qualified`. Follow the same pattern as Enrichment Mode (mkdir, mv, update-field for paths, update-status qualified). If status is anything else: ask: "Acme Plumbing already exists (status: X, score: Y). Update or create new?" Don't silently overwrite. |
 
 #### Enrichment Mode (imported leads)
 
-Imported leads are already in the pipeline — the user decided they want to work with them when they ran the CSV import. The qualification step is *verifying* that decision, not deciding whether to add them.
+Imported leads are already in the pipeline — the user decided to pursue them. Qualification *verifies* that decision.
 
 1. Run Steps 3–6 as normal (fetch, crawl, score, write report).
-2. **Create the client folder** (it wasn't created during import):
+2. Create the client folder and move the report:
    ```bash
    mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>"
    mv "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md" \
       "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>/"
    ```
-3. **Update the existing row** instead of creating a new one:
+3. Update the existing row (don't create new):
    ```bash
    python3 -m db_helper update-field <lead-id> '{"lead_score": <score>, "data_confidence": "<confidence>", "research_notes": "<summary>", "pitch_notes": "<pros/cons>", "website": "<URL>"}'
    python3 -m db_helper update-field <lead-id> '{"client_dir_path": "<path>", "qualification_report_path": "<path>"}'
    ```
-4. **Remove the `imported` tag:** `python3 -m db_helper tag remove --lead-id <id> --name imported`
-5. **Add any new tags** from the qualification research (wordpress, local-business, etc.).
-6. The shim auto-logs the updates. No "add to pipeline?" question — the lead is already there.
-7. Tell the user: *"Acme Plumbing updated: score NULL → 7, confidence LOW → HIGH. Imported tag removed — this lead is now fully qualified."* Offer the email draft as usual.
+4. Remove `imported` tag: `python3 -m db_helper tag remove --lead-id <id> --name imported`
+5. Add any new tags from qualification research: `python3 -m db_helper tag add --lead-id <id> --name <tag>`
+6. Update status to `qualified`: `python3 -m db_helper update-status <lead-id> qualified`
+7. Tell the user: *"Acme Plumbing updated: score NULL → 7, confidence LOW → HIGH. Imported tag removed — fully qualified."* Offer the email draft.
 
 ### 3. Fetch and crawl
-```
+
+```bash
 python3 -m web_research <url> --crawl
 ```
-This fetches the given URL, then automatically discovers and crawls key business pages (contact, about, services, testimonials, pricing). It parses the site's sitemap if available, falls back to homepage link extraction, and caps at 5 additional pages by default.
 
-Returns JSON with:
-- `fetch.{accessible, source, status_code, notes}` — the homepage fetch result
-- `crawl.{source, total_discovered, pages_crawled, audited_pages, not_crawled}` — what was discovered and what was crawled
-- `extraction.{facts, tech_stack, social_links, contacts, suggested_tags, missing, pages_scanned}` — merged extraction across all pages
+Fetches the URL, discovers and crawls key pages (contact, about, services, testimonials, pricing). Parses sitemap if available, falls back to homepage links, caps at 5 additional pages.
 
-**Tell the user which pages were crawled and which were not.** Example: "Crawled 6 pages (homepage, contact, about, testimonials, and 2 others). 2 pages not crawled (faq, privacy policy)." The freelancer can manually review any skipped pages if the lead looks promising.
-
-If `accessible` is false:
-- The site is JS-rendered without Playwright, returned 4xx/5xx, or refused the request.
-- Note this explicitly in the report. Set `data_confidence=LOW`. Do **not** invent a description from the URL or domain name.
-
-For single-page fetch (e.g., when the user links to a specific inner page and only wants that page checked), omit `--crawl`:
+Returns JSON:
 ```
+fetch.{accessible, source, status_code, notes}
+crawl.{source, total_discovered, pages_crawled, audited_pages, not_crawled}
+extraction.{facts, tech_stack, social_links, contacts, suggested_tags, missing, pages_scanned}
+```
+
+**Tell the user what was crawled and what wasn't.** Example: "Crawled 6 pages (homepage, contact, about, testimonials, +2). 2 skipped (faq, privacy policy)."
+
+If `accessible` is false — site is JS-rendered without Playwright, returned 4xx/5xx, or refused. Set `data_confidence=LOW`. Do **not** invent content. See `references/edge-cases.md` for additional handling (cached versions, social fallback).
+
+For single-page fetch, omit `--crawl`:
+```bash
 python3 -m web_research <url>
 ```
 
-### 4. Optional: search and social
-The web_research crawl covers the site's own pages. For external context, fall back to the agent's normal web search:
-- `"<company> <location>"` — to find Google Business profile, reviews
-- Look for LinkedIn / Facebook only if linked from the site or surfaced by search; do not go hunting
+### 4. External search (optional)
 
-For each fact you add from search, **write down where it came from** (e.g. *"Google Business profile, 2026-04-26"*). The provenance ends up in the report's source annotations.
+For context beyond the company's site, use `web_search`:
+- `"<company> <location>"` — Google Business profile, reviews
+- LinkedIn/Facebook only if surfaced by search — don't hunt
+
+**Note the source** for every external fact: *"Google Business profile, 2026-04-26"*
 
 ### 5. Score 1–10
 
-Five factors per architecture (architecture / lead-qualifier §5.1):
+```
+🔴 HIGH    → Need Signal    Does their site clearly need work?
+🔴 HIGH    → Size Fit       Right size for a freelancer?
+🟡 MEDIUM  → Budget Signal  Can they afford professional web design?
+🟡 MEDIUM  → Accessibility  Can the freelancer reach the decision maker?
+🟢 LOW     → Timing Signal  Are they looking for web services now?
+```
 
-| Factor | Weight | What it measures |
-|---|---|---|
-| Need Signal | High | Does their current site clearly need work? |
-| Size Fit | High | Right size for a freelancer (not enterprise, not too small) |
-| Budget Signal | Medium | Indicators they can afford professional web design |
-| Accessibility | Medium | Can the freelancer reach the decision maker? |
-| Timing Signal | Low | Are they looking for web services now? |
-
-Honesty rules (lead-qualifier.md §5.3):
-- The score stored in the database is a **single integer 1–10**.
-- Nuance ("could be a 7 if budget signal confirmed") goes in the **Fit Assessment paragraph** of the report, not the database.
-- If you genuinely lack info to score, store **NULL** — do not pick a number to fill the field. Explain in the report.
+**Honesty rules:**
+- Single integer 1–10 stored in DB. Nuance goes in the report, not the score.
+- If you can't score, store **NULL** — don't guess. Explain in the report.
 - Never inflate. A 5 is fine. Honest scores build trust.
 
 ### 6. Write the report
 
-Save to:
-```
-$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md
-```
+Save to `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-DD>.md`
 
-**Keep this flat location for the initial save.** When the freelancer adds the lead to the pipeline (Step 7a), the report is moved to the client folder. This two-step process means the report exists even if the freelancer decides not to add the lead.
+**Keep this flat location for the initial save.** When added to pipeline (Step 7a), the report moves to the client folder. The two-step process means the report exists even if the freelancer decides not to add the lead.
 
-Use this exact structure (lead-qualifier.md §6.1):
+Report structure:
 
 ```markdown
 # Lead Qualification: <Company Name>
@@ -184,23 +183,21 @@ Key observations about their current site.
 
 ## Key Findings
 - <specific, evidence-based finding>
-- <specific, evidence-based finding>
 - ...
 
 ## Unverified / Could Not Confirm ⚠️
 
 **Mandatory section. Never omit.**
 
-Focus on findings that *should* have been verifiable but weren't. Skip universal unknowables (budget, internal decisions, timeline) — those are obvious.
+Focus on findings that *should* have been verifiable but weren't. Skip universal unknowables (budget, internal decisions, timeline).
 
-- <claim that couldn't be confirmed> — <why> — <how the freelancer could verify>
-- <assumption made> — <what it's based on> — <alternative interpretations>
-- <data that should exist but doesn't> — e.g. "No Google Business profile found — unusual for a local business this size"
+- <claim> — <why> — <how to verify>
+- <assumption> — <what it's based on> — <alternative interpretations>
 
-If everything was verified: "⚠️ All findings above were verified from public sources."
+If all verified: "⚠️ All findings above were verified from public sources."
 
 ## Recommendation
-2–3 sentences: what should the freelancer do with this lead, what angle to take.
+2–3 sentences: what to do, what angle to take.
 
 ## Suggested Next Steps
 1. <action>
@@ -210,22 +207,14 @@ If everything was verified: "⚠️ All findings above were verified from public
 
 ### 7. Ask before adding to pipeline
 
-The report is written and saved regardless. But adding the lead to the pipeline is the freelancer's decision — show them the key details and ask.
+Show the user: **Score** (X/10 or NULL), **Verdict** (STRONG/GOOD/MODERATE/WEAK), **One-line summary**.
 
-Show the user:
-- **Score:** X/10 (or "NULL — insufficient information")
-- **Verdict:** STRONG | GOOD | MODERATE | WEAK
-- **One-line summary:** the most important finding or reason
+Ask: "Add to pipeline?"
 
-Then ask: "Add to pipeline?"
+- **Yes** → Step 7a.
+- **No / maybe later** → stop. Report is saved — they can add it anytime (see "Add from existing report" below).
 
-- **If yes:** proceed to Step 7a.
-- **If no:** stop. The report is saved at the path from Step 6 — the freelancer can come back later and add it then (see "Add from existing report" below).
-- **If they say something like "maybe later":** same as no — the report is saved, they can revisit anytime.
-
-### 7a. Create client folder and write the database row
-
-First, create the client folder and move the report:
+### 7a. Create client folder and write database row
 
 ```bash
 mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>"
@@ -233,124 +222,121 @@ mv "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/<company-slug>-<YYYY-MM-
    "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>/"
 ```
 
-Then write the database row. Read the saved report file and extract the values from it — do NOT rely on conversation memory.
+Write the row. **Read the saved report file** to extract values — do NOT rely on conversation memory.
 
-```
+```bash
 python3 -m db_helper add-lead "<Company Name>" \
     --website "<URL>" \
     --lead-score <integer from report, or omit if NULL> \
     --data-confidence <from report> \
-    --research-notes "<2–3 sentence summary derived from the report>" \
-    --pitch-notes "<pros and cons from report>" \
+    --research-notes "<2–3 sentence summary from Fit Assessment + Recommendation>" \
+    --pitch-notes "<pros/cons from findings>" \
     --tags "<from report>" \
     --client-dir-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>" \
     --qualification-report-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<company-slug>/<company-slug>-<YYYY-MM-DD>.md"
+
+python3 -m db_helper update-status <lead-id> qualified
 ```
 
-Notes:
-- The `research_notes` column is the **summary**, not the report. Read the report's Fit Assessment and Recommendation sections to compose it.
-- The `--lead-score` comes from the report's "Score:" line in the Fit Assessment.
-- The `--pitch-notes` is a **pros and cons list** derived from the report's findings. Format:
-  ```
-  **Pros:** <2-4 reasons to pitch, comma-separated>
-  **Cons:** <2-4 reasons it might not be worth it, comma-separated>
-  ```
-  Frame from the freelancer's perspective: Pros = why pitch (work needed, right size, clear angle). Cons = why skip (too small, wrong location, no timing signal, hard to reach). Pick the most impactful points — don't list everything.
-- Tags come from the report's findings — check the tech stack, business type, and any notable characteristics.
-- `--client-dir-path` stores the client folder location. All future reports (proposal, onboarding) go here.
-- `--qualification-report-path` stores the qualification report location so the Proposal Builder can find and read it.
-- The shim auto-logs `lead_created` and `lead_scored` (if score given) in `activity_log`.
-- Suggested tags from `web_research`'s `extraction.suggested_tags` are a starting point — add/remove to match what you actually saw.
+The lead enters the pipeline as `qualified` — it was scored and the user consciously added it.
+
+Key field details:
+
+```
+research_notes  → Summary (not the report). From Fit Assessment + Recommendation.
+lead_score      → From report's "Score:" line. Integer or omit for NULL.
+pitch_notes     → Pros/cons list from the freelancer's perspective:
+                   **Pros:** <why pitch — work needed, right size, clear angle>
+                   **Cons:** <why skip — too small, wrong location, no timing signal>
+                   Pick the most impactful 2-4 each. Don't list everything.
+tags            → From findings (tech stack, business type, notable characteristics).
+                   web_research's suggested_tags are a starting point — adjust.
+client_dir_path           → All future reports (proposal, onboarding) go here.
+qualification_report_path → Proposal Builder reads this to inform the proposal.
+```
+
+The shim auto-logs `lead_created` and `lead_scored` in `activity_log`.
 
 ### Add from existing report
 
-When the freelancer says something like "add [company] to my pipeline":
+When the freelancer says "add [company] to my pipeline":
 
-1. **Check the pipeline first:**
-```
-python3 -m db_helper get-lead --company "<Company Name>"
-```
-If it returns results: tell the user "[Company] is already in your pipeline (status: X, score: Y)." Offer to show the existing entry or update it.
+1. **Check pipeline first:**
+   ```bash
+   python3 -m db_helper get-lead --company "<Company Name>"
+   ```
+   If exists: tell user and offer to show/update.
 
 2. **Check for a qualification report:**
-```bash
-ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<company-slug>* 2>/dev/null
-```
-Also check the client folder in case the report was already moved:
-```bash
-ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/clients/<company-slug>/qualification* 2>/dev/null
-```
-If a report exists: read it, extract score + data confidence + compose research_notes from the report content, then run the `add-lead` command from Step 7a (including creating the client folder and moving the report).
+   ```bash
+   ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<company-slug>* 2>/dev/null
+   ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/clients/<company-slug>/<company-slug>* 2>/dev/null
+   ```
+   If found: read report, extract values, run `add-lead` from Step 7a.
 
-3. If no report exists: tell the user "No qualification report found for [company]. Run Lead Qualifier first to create one, or provide details to add manually."
+3. If no report: "No qualification report found for [company]. Run Lead Qualifier first to create one, or provide details to add manually."
 
-This flow works across sessions — the report file is the source of truth, not conversation memory.
+Works across sessions — the report file is the source of truth, not conversation memory.
 
-### 8. First-contact email draft + talking points
+### 8. Email draft + talking points
 
 Offer once: *"Want a first-contact email draft?"*
 
-If yes, output **in chat only** (do not save). Always include both:
+If yes, read the full qualification report first (if not already in context from this session):
 
-**The draft email:**
-- 3–5 sentences max
-- Reference something specific from the research — not generic
-- Suggest a concrete next step (discovery call, quick chat)
-- Helpful and professional, never pushy
-- **Never include the qualification score** — that's internal
-- Never insult the prospect's current site
-- No pricing
-
-**Talking points** (always included after the draft):
-
-A structured brief the freelancer can use to write their own version or adapt the draft. Format:
-
-```
-**Angle:** <one-line approach — e.g. "value-led: specific things costing them enquiries">
-**Pain points:** <2-3 concrete issues found during research>
-**Key fact:** <the most noteworthy positive thing about the business>
-**Suggested opener:** <how to introduce yourself — e.g. "found via search, not a cold list">
-**Call to action:** <what to suggest — quick chat, phone call, free audit>
-**Things to avoid:** <anything that would land wrong — e.g. don't mention their competitors>
+```bash
+python3 -m db_helper get-lead --company "<company>"
 ```
 
-The talking points help the freelancer understand *why* the draft is structured the way it is, so they can adopt the strategy in their own voice.
+Read the file at the `qualification_report_path` field from the result. Use the **full report** — not the DB summary — for the email draft and talking points. The report contains the specific findings, tech stack, and observations needed to write a personalised email.
 
-## Anti-hallucination rules (non-negotiable)
+If `qualification_report_path` is null, fall back to `research_notes` from the DB. The email will be less specific but still functional.
 
-These come directly from `design-philosophy.md`. Every report must comply.
+Output **in chat only** (do not save).
 
-1. **Only report what was actually found.** Quote or closely paraphrase the source. Don't interpret and reframe.
-2. **If you didn't find it, say so.** "Their CMS appears to be custom — could not confirm" is correct. "Their CMS is custom" without the qualifier is wrong.
-3. **Don't extrapolate from limited data.** One contact form ≠ "lead generation focus." One review ≠ "customers are dissatisfied."
-4. **Distinguish observation, inference, and hallucination.** Label inferences. Never include fabricated statistics.
-5. **Use placeholders over fabrication.** "[Confirm with client: X]" is honest. A guess looks authoritative until it backfires.
-6. **Numbers must be traceable.** Employee count, page count, load time, score — every number ties to a source.
-7. **Verify names, URLs, contact details.** These are easy to verify and catastrophic to get wrong.
-8. **Confidence levels on key claims.** HIGH = direct from their own site. MEDIUM = third-party (search, reviews). LOW = inferred from indirect evidence.
+**Draft email:** 3–5 sentences, reference specific research, suggest a next step, professional tone, no score, no pricing, never insult their current site. **Do not use generic template language** — every sentence should reference something specific from the report (their actual tech stack, a real page you found, a concrete issue, their industry, their size). Two emails for different clients must read like two different people wrote them.
 
-## Edge cases
+**Talking points** (always include):
 
-| Scenario | Action |
-|---|---|
-| Company name only, no website found | Search for it. Still nothing → ask the user. Don't proceed without a URL or LinkedIn. |
-| Site is down / unreachable | Note in report. Try cached version or social. Flag as data quality issue. `data_confidence=LOW`. |
-| Multiple companies with similar names | Present options, ask user to confirm. Don't guess. |
-| Clearly enterprise (500+ employees) | Still produce report. Note: likely has in-house team or agency — different approach needed. |
-| Very small (micro-business) | Still produce report. Note: budget likely limited. |
-| LOW data confidence | Heavy uncertainty flags. Recommend manual research before contact. Don't inflate score because of missing contrary evidence. |
-| Different country | Note location, timezone, language, payment implications. Don't disqualify on location alone. |
-| Already exists in pipeline | Step 2 already handles this — present options. |
-| User says "add [company]" but no report exists | Check for saved report first (see "Add from existing report"). If nothing found, tell the user to run Lead Qualifier first or provide details manually. |
-| Config file missing | Auto-created by `db_helper` on first call. No setup step. |
+```
+Angle:         <one-line approach>
+Pain points:   <2-3 concrete issues found>
+Key fact:      <most noteworthy positive thing>
+Suggested opener: <how to introduce yourself>
+Call to action:   <quick chat, phone call, free audit>
+Things to avoid:  <what would land wrong>
+```
+
+## 🔒 Anti-hallucination rules
+
+Non-negotiable. Every report must comply.
+
+1. **Only report what was actually found.** Quote or closely paraphrase.
+2. **If you didn't find it, say so.** "Appears to be custom — could not confirm" is correct.
+3. **Don't extrapolate from limited data.** One form ≠ "lead generation focus."
+4. **Distinguish observation, inference, and hallucination.** Label inferences.
+5. **Use placeholders over fabrication.** "[Confirm with client: X]" is honest.
+6. **Numbers must be traceable.** Every number ties to a source.
+7. **Verify names, URLs, contact details.** Easy to verify, catastrophic to get wrong.
+8. **Confidence levels on key claims.** HIGH = their own site. MEDIUM = third-party. LOW = inferred.
 
 ## End-of-turn
 
-**If the freelancer said yes to adding:** tell the user lead ID, score, and any tags applied. Offer the optional email draft.
+**If added to pipeline:** tell the user lead ID, score, and tags. Offer the email draft.
 
-**If the freelancer said no or later:** tell the user the report path. Remind them they can add it anytime.
+**If not added:** tell the user the report path. Remind them they can add it anytime.
 
-Examples:
-> Added Acme Plumbing to pipeline (score 7/10, tags: wordpress, local-business). Want a first-contact email draft?
+```
+✅ "Added Acme Plumbing to pipeline (score 7/10, tags: wordpress, local-business). Want a first-contact email draft?"
 
-> Report saved at `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/acme-plumbing-2026-04-26.md`. You can add it to the pipeline anytime — just say "add Acme Plumbing" and I'll pull from the report.
+❌ "Report saved at $WEBCLIENT_STUDIO_CONFIG_DIR/reports/qualifications/acme-plumbing-2026-04-26.md. Add it anytime — just say 'add Acme Plumbing'."
+```
+
+## Notes
+
+- **Edge cases** — see `references/edge-cases.md` (dead sites, enterprise leads, international prospects, micro-businesses)
+- **Format output** for the current channel — adapt formatting to match what the platform supports
+- **Cross-skill data contract:** downstream skills read these database fields:
+  - `qualification_report_path` → Proposal Builder, Project Onboarder
+  - `lead_score` → Pipeline Tracker (sort by score)
+  - `research_notes`, `tags`, `data_confidence` → all downstream skills

@@ -3,44 +3,43 @@ name: pipeline-tracker
 description: View, manage, and query the freelance pipeline. Use when the user asks to show their pipeline, update a lead's status, check follow-ups, manage tags, view lead history, manage project tasks, see stats, or export data. The default entry point for any "what's going on with my leads / projects" question.
 ---
 
-# Pipeline Tracker
+# 📊 Pipeline Tracker
 
 The command centre. View pipeline state, change statuses, manage tags and tasks, check follow-up suggestions, look up history, and export. No setup flow — the database and config auto-create on first call.
 
-## When to use this skill
+## When to use
 
-The Pipeline Tracker handles a wide range of intents. Route based on what the user actually asked:
+Route based on what the user asks:
 
-| User says | Section |
-|---|---|
-| "show my pipeline" / "pipeline summary" | §A Master view |
-| "show qualified leads" / "show follow-ups" / "show lost" | §A Filtered views |
-| "tell me about <client>" / "<client> details" / "what do we know about <client>" | §B Deep view |
-| "update <client> to <status>" / "mark <client> as <status>" | §C Status updates |
-| "any follow-ups needed?" / "any overdue?" | §D Follow-ups |
-| "tag <client> as <x>" / "remove <tag> from <client>" / "show all <tag> leads" | §E Tags |
-| "what happened with <client>?" / "lead history" / "what happened this week?" | §F History |
-| "find leads matching <query>" / "search for <x>" | §G Search |
-| "show <client>'s tasks" / "mark <task> done" / "add task" / "what's left to do?" | §H Tasks |
-| "how many leads this month?" / "conversion rate" | §I Stats |
-| "import CSV" / "import leads" / "upload spreadsheet" / "import from file" | §K Import |
-| "export my pipeline" / "export to CSV / JSON" | §J Export |
+```
+"show my pipeline" / "pipeline summary"     → §A Master view
+"show qualified leads" / "show follow-ups" → §A Filtered views
+"tell me about <client>" / "<client> details" → §B Deep view
+"update <client> to <status>"              → §C Status updates
+"any follow-ups needed?" / "any overdue?"  → §D Follow-ups
+"tag <client> as <x>" / "show all <tag>"  → §E Tags
+"what happened with <client>?" / "history" → §F History
+"find leads matching <query>" / "search"   → §G Search
+"show <client>'s tasks" / "mark task done" → §H Tasks
+"how many leads this month?" / "stats"     → §I Stats
+"import CSV" / "import leads" / "upload"   → §K Import
+"export my pipeline" / "export to CSV"     → §J Export
+"add [company] to my pipeline"           → §L Quick add
+```
 
-This skill does **not** create new leads through the normal qualification flow (Lead Qualifier does), but **does** create leads via CSV import (§K). It does **not** create the initial onboarding task set (Project Onboarder does). It manages everything day-to-day after.
+This skill does **not** create leads through qualification (Lead Qualifier does), but **does** create leads via CSV import (§K). It does **not** create onboarding task sets (Project Onboarder does).
 
-## Tools
+## ⚡ Tools
 
 ```bash
 SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"
 PYTHONPATH="$SHARED" python3 -m db_helper <command>
 ```
 
-### ⚠️ Path expansion in JSON arguments
-
-When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$WEBCLIENT_STUDIO_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+**⚠️ Path expansion in JSON:** The shell does not expand variables inside single quotes. Always expand paths before inserting into JSON:
 
 ```bash
-# ❌ Wrong — $WEBCLIENT_STUDIO_CONFIG_DIR is stored as a literal string
+# ❌ Wrong — $VAR stored as literal string
 python3 -m db_helper update-field <id> '{"path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/foo"}'
 
 # ✅ Right — variable expands before JSON is built
@@ -48,241 +47,268 @@ CLIENT_DIR="$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme"
 python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
 ```
 
-This matters because the database stores paths that are later read by other skills. A literal `$HOME` works for the current user but will not resolve correctly in all contexts.
+## Guard clause
 
-## First Run Check
+Before any section, run:
 
-Before any section below, run the guard clause:
 ```bash
 python3 -c "import sys,os; os.environ.get('WEBCLIENT_STUDIO_CONFIG_DIR') or exit(1); sys.path.insert(0, os.environ['WEBCLIENT_STUDIO_CONFIG_DIR']+'/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
-If `OK` — proceed.
-
-If it fails — read `references/setup.md` from the bundle source and execute the setup steps. Once setup completes, return here.
+- **OK** → set `SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"` and proceed. All `python3 -m` commands assume `PYTHONPATH="$SHARED"`.
+- **Fails** → read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` (or bundle's `references/setup.md`), execute setup, then return here.
 
 ---
 
-## §A. Master view
+## §A. Master View
 
 The default pipeline view. Scannable, compact, action-oriented.
 
-```
+```bash
 python3 -m db_helper pipeline
 python3 -m db_helper stale
 ```
 
-### Display format
+**Group by status** in this order:
 
-**Group by status.** Use these status groups in this order:
-- 🟢 Active — currently in progress
-- 🔵 Onboarding — being set up
-- 🟡 Proposal sent — awaiting response
-- 🟠 Qualified — worth pursuing
-- ⚪ Lead — new, not yet assessed
-- 🔴 Lost — declined or unresponsive
-- ✅ Complete — finished projects
-- Custom statuses — group under their own header if they exist
+```
+🟢 Active          — currently in progress
+🔵 Onboarding       — being set up
+🟡 Proposal sent    — awaiting response
+🟠 Qualified        — worth pursuing
+⚪ Lead             — new, not yet assessed
+🔴 Lost             — declined or unresponsive
+✅ Complete         — finished projects
+```
 
 **Per lead, one line:**
 ```
 <company> — score <X>/10 — <next-action hint>
 ```
 
-Where `<next-action hint>` is the most useful piece of context:
-- If proposal sent and no response: *"proposal sent <N> days ago, no response"*
-- If last follow-up was recent: *"followed up <N> days ago"*
-- If stale: *"⚠️ follow up suggested (<N> days in <status>)"*
-- If has pending tasks: *"X tasks remaining"*
-- If new: *"added <date>"*
-- If completed: *"completed <date>"*
+Where `<next-action hint>` is the most useful context:
+- Proposal sent, no response: *"proposal sent <N> days ago, no response"*
+- Recent follow-up: *"followed up <N> days ago"*
+- Stale: *"⚠️ follow up suggested (<N> days in <status>)"*
+- Has pending tasks: *"X tasks remaining"*
+- New: *"added <date>"*
+- Completed: *"completed <date>"*
 
-**Sort within groups:** by `lead_score DESC` (highest score = most promising = top).
+**Sort within groups:** `lead_score DESC` (highest = top).
 
-**Stale leads:** flag with ⚠️ inline. Mention stale leads **once per session** — don't repeat the suggestion in subsequent messages.
+**Stale leads:** flag with ⚠️ inline. Mention stale leads **once per session** — don't repeat.
 
-**Compact by default.** One line per lead. No markdown tables (they render poorly in Slack and on mobile). Use structured text with bullet points per status group.
+**Compact by default.** One line per lead. No markdown tables (poor Slack/mobile rendering). Structured text with bullet points per status group.
 
 ### Filtered views
 
-When the user asks for a specific status or category, show only that group using the same format:
-
-```
+```bash
 python3 -m db_helper pipeline --status <status>
 ```
 
-Examples:
-- "show my qualified leads" → `pipeline --status qualified`
-- "what proposals are out?" → `pipeline --status proposal_sent`
-- "show lost leads" → `pipeline --status lost`
-- "any follow-ups needed?" → delegates to §D Follow-ups
+Examples: "show qualified leads" → `--status qualified`, "what proposals are out?" → `--status proposal_sent`
 
-### Empty pipeline
-
-*"No leads in pipeline yet. Say 'qualify this lead: <company>' to add your first one."*
+**Empty pipeline:** *"No leads yet. Add a company to track (say 'add Acme Plumbing to my pipeline') or qualify a lead ('qualify this lead: <url>')."*
 
 ---
 
-## §B. Deep view
+## §B. Deep View
 
-The full client dossier. Everything we know about one lead in one place.
+The full client dossier. Everything about one lead.
 
-```
+```bash
 python3 -m db_helper get-lead --company "<client>"
 python3 -m db_helper tag list --lead-id <id>
 python3 -m db_helper task pending --lead-id <id>
 python3 -m db_helper activity --lead-id <id>
 ```
 
-**Trigger:** "tell me about <client>", "<client> details", "what do we know about <client>", or when the user selects a lead from the master view.
+**Trigger:** "tell me about <client>", "<client> details", "what do we know about <client>"
 
 ### Display format
 
-```
-**<Company Name>**
-Score: <X>/10 | Status: <status> | Added: <date> | Data Confidence: <data_confidence>
+**Master view** — wrapped in a code block for visual separation from chat:
 
-**Research Notes**
+```
+🟢 Active
+• Apex Roofing — score 8/10 — 3 tasks remaining
+• Beehive Bakery — score 6/10 — 1 task remaining
+
+🟡 Proposal sent
+• Cedarwood Dental — score 7/10 — proposal sent 12 days ago, no response
+
+🟠 Qualified
+• Maple Street Cafe — score 8/10 — added 2026-04-28
+
+⚪ Lead
+• Northstar Accounting — added 2026-04-30
+
+🔴 Lost
+• Old Town Deli — score 5/10 — declined 2026-04-20
+
+✅ Complete
+• Greenfield Landscaping — score 7/10 — completed 2026-04-10
+```
+
+**Deep view** — wrapped in a code block:
+
+```
+**Apex Roofing**
+📊 Score: 8/10 | 🟢 Active | Added: 2026-04-15 | 📋 Proposal: 2026-04-18 | Confidence: HIGH
+
+📝 Research Notes
 <research_notes from db>
 
-**Pros & Cons**
+⚖️ Pros & Cons
 <pitch_notes from db, or "No pitch notes yet">
 
 ---
 
-**Discovery Notes**
+💬 Discovery Notes
 <discovery_notes from db, or "No discovery notes yet">
 
 ---
 
-**Proposal Summary**
+📋 Proposal Summary
 <proposal_summary from db, or "No proposal yet">
 
 ---
 
-**Tags**
+🏷️ Tags
 <tag1>, <tag2>, <tag3>
 
 ---
 
-**Pending Tasks** (<count>)
+✅ Pending Tasks (<count>)
 - <task 1> [<priority>] <due-date or "no due date">
-- <task 2> [<priority>] <due-date or "no due date">
-(or "No pending tasks")
+- ...
 
 ---
 
-**Recent Activity** (last 5)
+📜 Recent Activity (last 5)
 - <date> — <human-readable action>
-- <date> — <human-readable action>
-...
+- ...
 ```
 
-Filter out `tag_added` and `tag_removed` entries — tags are already displayed in their own section above. Show only meaningful actions: created, scored, status changed, follow-up, proposal created, project started, tasks added/completed, notes added.
+Activity translations with emojis for key milestones:
+```
+lead_created       → "Created"
+lead_scored        → "Scored: <details>"
+discovery_added    → "Discovery notes added"
+proposal_created    → "📝 Proposal created"
+status_changed     → "Status: <old> → <new>"
+follow_up          → "Followed up"
+project_started    → "🚀 Project started"
+task_created       → "Task added: <details>"
+task_completed     → "✅ Task done: <details>"
+note_added         → "Note: <details>"
+tag_added / tag_removed → filtered out (shown in Tags section)
+```
 
-Use the action code translations from §F (History) to make activity readable.
+Filter out `tag_added`/`tag_removed` from activity (shown in Tags section). Use action code translations from §F.
 
-For ambiguous matches on `<client>`, present all candidates with status + score and ask the user to pick. Don't guess.
+For ambiguous company matches, present all candidates with status + score. Ask the user to pick.
 
 ---
 
-## §C. Status updates
+## §C. Status Updates
 
-```
+```bash
 python3 -m db_helper get-lead --company "<client>"
 python3 -m db_helper update-status <lead-id> <new-status>
 ```
 
-The shim auto-updates `status_since` and `date_updated`, and logs `status_changed` with old/new in `details`.
+The shim auto-updates `status_since`, `date_updated`, and logs `status_changed`.
 
-**Confirmation required for `lost`** (architecture §9). Show the lead's current status and ask: *"Mark Acme as lost? (Status: qualified, score: 7. Data is preserved — you can revert later.) [y/N]"* Wait for `y`. Anything else cancels.
+**Confirmation required for `lost`:** Show current status and ask: *"Mark Acme as lost? (Status: qualified, score: 7. Data preserved — you can revert later.) [y/N]"* Wait for `y`.
 
-**Special check for `active`:** before applying, fetch tasks:
-```
+**Special check for `active`:** Before applying, check tasks:
+```bash
 python3 -m db_helper task list --lead-id <lead-id>
 ```
-If empty, flag: *"This lead has no tasks. Run Project Onboarder first to set up the project, or confirm you want to set status=active without onboarding."*
+If empty: *"This lead has no tasks. Run Project Onboarder first, or confirm you want to set status=active without onboarding."*
 
-For ambiguous matches on `<client>`, present all candidates and ask the user to pick. Don't guess.
+For ambiguous matches, present candidates and ask. Don't guess.
 
-Output one line on success: `Acme: qualified → proposal_sent.`
+Output: `Acme: qualified → proposal_sent.`
 
 ---
 
 ## §D. Follow-ups
 
-```
+```bash
 python3 -m db_helper stale
 ```
 
-Returns leads where `(now - MAX(status_since, last_follow_up)) > per-status threshold`. The query already respects per-status thresholds from `config.preferences.statusFollowUpDays` — `null` means follow-ups disabled for that status (default for `active`, `complete`, `lost`).
+Returns leads where `(now - MAX(status_since, last_follow_up)) > per-status threshold`. Respects `config.preferences.statusFollowUpDays` — `null` means follow-ups disabled (default for `active`, `complete`, `lost`).
 
-Render as: *"<Company> — <N> days in <status> (threshold: <T>)"* sorted most overdue first.
+Render: *"<Company> — <N> days in <status> (threshold: <T>)"* sorted most overdue first.
 
-Per-row offer: *"Want a follow-up email draft for Acme?"*
+Per-row: *"Want a follow-up email draft for Acme?"*
 
-If yes, draft in chat (never auto-send). Use the lead's full row + recent activity for context (`db_helper activity --lead-id <id>`). Tone: helpful, not pushy. Specific reference to what's pending. Clear next step.
+If yes, draft in chat (never auto-send). Use the lead's row + recent activity for context. Tone: helpful, not pushy.
 
 When the user says they followed up:
-```
+```bash
 python3 -m db_helper follow-up <lead-id>
 ```
-This updates `last_follow_up` only — it does **not** touch `status_since`. The next staleness check uses `MAX(status_since, last_follow_up)`, so the follow-up "buys time" without losing the underlying status history (storage.md §7.3).
+Updates `last_follow_up` only — does **not** touch `status_since`. The follow-up "buys time" without losing status history.
 
 ---
 
 ## §E. Tags
 
-```
+```bash
 python3 -m db_helper tag add --lead-id <id> --name <name> [--category custom|service|source|budget]
 python3 -m db_helper tag remove --lead-id <id> --name <name>
 python3 -m db_helper tag list --lead-id <id>
 python3 -m db_helper tag leads --name <name>
 ```
 
-Tag names are normalised to lowercase. Unknown tags are auto-created. The shim auto-logs `tag_added` / `tag_removed`.
-
-Combine with other queries by chaining: pipeline view → filter the rows by tag in your output. The shim doesn't compose filters in v1.
+Tag names normalised to lowercase. Unknown tags auto-created. Auto-logs `tag_added`/`tag_removed`.
 
 ---
 
 ## §F. History
 
-```
-python3 -m db_helper activity --lead-id <id>          # full lead history
-python3 -m db_helper activity --days 7                # all leads, last N days
+```bash
+python3 -m db_helper activity --lead-id <id>     # full lead history
+python3 -m db_helper activity --days 7           # all leads, last N days
 ```
 
-Render as a chronological timeline grouped by lead (when querying recent), or strict chronological order (when querying one lead). Translate raw action codes to human language:
-- `lead_created` → "Created"
-- `lead_scored` → "Scored: <details>"
-- `discovery_added` → "Discovery notes added"
-- `proposal_created` → "Proposal created"
-- `status_changed` → "Status: <details>"
-- `follow_up` → "Followed up"
-- `project_started` → "Project started"
-- `task_created` → "Task added: <details>"
-- `task_completed` → "Task done: <details>"
-- `tag_added` / `tag_removed` → filtered out (shown in Tags section instead)
-- `note_added` → "Note: <details>"
+Render as chronological timeline. Translate action codes:
+
+```
+lead_created    → "Created"
+lead_scored     → "Scored: <details>"
+discovery_added → "Discovery notes added"
+proposal_created → "Proposal created"
+status_changed  → "Status: <details>"
+follow_up       → "Followed up"
+project_started → "Project started"
+task_created    → "Task added: <details>"
+task_completed  → "Task done: <details>"
+note_added      → "Note: <details>"
+tag_added / tag_removed → filtered out (shown in Tags section)
+```
 
 ---
 
 ## §G. Search
 
-```
+```bash
 python3 -m db_helper search "<query>"
 ```
 
-Searches across `company`, `contact_name`, `contact_email`, `research_notes`. Case-insensitive `LIKE %query%`. Return all matches; don't pre-filter.
+Searches across `company`, `contact_name`, `contact_email`, `research_notes`. Case-insensitive `LIKE %query%`. Return all matches.
 
-For specific lookups by company name only, prefer `get-lead --company` (also fuzzy, faster, no notes search).
+For company name only, prefer `get-lead --company` (fuzzy, faster, no notes search).
 
 ---
 
 ## §H. Tasks
 
-```
+```bash
 python3 -m db_helper task list --lead-id <id>
 python3 -m db_helper task pending --lead-id <id>
 python3 -m db_helper task find --lead-id <id> --name "<query>"
@@ -291,89 +317,84 @@ python3 -m db_helper task status --task-id <id> --new-status todo|in_progress|do
 ```
 
 **Updating by name:**
-1. `task find --lead-id <id> --name "<user query>"` (fuzzy match)
-2. If 0 results → tell user. If 1 → use it. If >1 → present the candidates and ask.
+1. `task find --lead-id <id> --name "<user query>"` (fuzzy)
+2. 0 results → tell user. 1 → use it. >1 → present and ask.
 3. `task status --task-id <found-id> --new-status <status>`
 
-The shim auto-logs `task_created`, `task_completed` (when status → `done`), or `status_changed` for other transitions.
+Auto-logs `task_created`, `task_completed`, or `status_changed`.
 
-**"What's left to do for <client>?"** → use `task pending`. Sort by priority (high first) then due date.
+"What's left to do?" → `task pending`, sort by priority then due date.
 
-**"Any overdue tasks?"** → fetch all leads' pending tasks and filter where `due_date < today`. The shim doesn't have a single command for this — query per active lead.
+"Any overdue?" → fetch pending tasks for all active leads, filter `due_date < today`.
 
 ---
 
 ## §I. Stats
 
-For counts, query the activity log:
-
-```
+```bash
 python3 -m db_helper activity --days 30
 ```
 
-Then aggregate in your response. Examples:
-- "How many leads this month?" → count `lead_created` actions in the last 30 days.
-- "Conversion rate from lead to active?" → distinct lead_ids that ever had `status_changed: lead -> qualified` divided by total `lead_created` (approximate; the activity log is the source of truth).
-- "How many proposals out?" → `pipeline --status proposal_sent` then count.
+Aggregate from the activity log in your response:
+- "How many leads this month?" → count `lead_created` in last 30 days
+- "Conversion rate?" → leads with `status_changed: lead → qualified` ÷ total `lead_created`
+- "How many proposals out?" → `pipeline --status proposal_sent` then count
 
-Be honest about approximation. If a stat would require multiple queries, do them; if it's not derivable from the activity log + leads table, say so.
+Be honest about approximation. If not derivable from the log + leads table, say so.
 
 ---
 
 ## §J. Export
 
-```
+```bash
 python3 -m db_helper export --format csv
 python3 -m db_helper export --format json
 python3 -m db_helper export --lead-id <id> --format json
 ```
 
-Writes to `$WEBCLIENT_STUDIO_CONFIG_DIR/exports/`. The CLI prints the output path. Tell the user where it landed.
+Writes to `$WEBCLIENT_STUDIO_CONFIG_DIR/exports/`. Tell the user the path.
 
-CSV is for spreadsheet/Notion/Sheets import (one row per lead, tags pipe-separated). JSON is for backup or programmatic use (full lead bundle including tags, activity, tasks).
+CSV → spreadsheet/Notion (one row per lead, tags pipe-separated). JSON → backup/programmatic (full bundle including tags, activity, tasks).
 
-Confirmation is **not** required for export — it's a read-only operation on the user's own data.
+No confirmation required — read-only on user's own data.
 
 ---
 
 ## §K. Import
 
-Import leads from a CSV file into the pipeline. This is a two-phase flow:
+Import leads from CSV into the pipeline. Two-phase flow:
 
-- **Phase 1 (here):** Bulk import — add leads to pipeline with `imported` tag, `LOW` confidence, `lead` status. Fast, no research.
-- **Phase 2 (Lead Qualifier):** On-demand enrichment — when the user says "qualify [imported company]", the Lead Qualifier detects it already exists, runs research, and updates the existing row instead of creating a new one.
-
-Import is a special case of lead creation — external data the user already decided they want in their pipeline. It's not the normal qualify-then-add flow.
-
-### Trigger phrases
-
-"import CSV", "import leads", "upload spreadsheet", "import from file", "I have a list of companies"
+- **Phase 1 (here):** Bulk import — add leads with `imported` tag, `LOW` confidence, `lead` status
+- **Phase 2 (Lead Qualifier):** On-demand enrichment — "qualify [company]" detects existing lead, runs research, updates the row
 
 ### Flow
 
-**1. User provides CSV** — file path or drops the file.
+**1.** User provides CSV (file path or drops file).
 
-**2. Read the file.** Use the `csv` module via a one-liner or read directly. If the file contains garbled characters (mojibake), re-read with `encoding='latin-1'` or `'cp1252'` — CSVs exported from Excel on Windows often use these encodings instead of UTF-8.
+**2.** Read it. If garbled characters (mojibake), try `encoding='latin-1'` or `'cp1252'` (common Windows Excel export).
 
-**3. Show headers + sample.** Display all column headers and the first 3–5 rows so the user can see what they're working with.
+**3.** Show headers + first 3–5 rows so the user can see what they're working with.
 
-**4. Propose column mapping.** Show a mapping table: their CSV columns → our DB fields. Columns that don't match our schema are marked "skip".
+**4.** Propose column mapping:
 
-Valid target fields: `company`, `website`, `contact_name`, `contact_email`, `status`, `lead_score`, `data_confidence`, `research_notes`, `pitch_notes`, `tags`
+```
+Valid target fields:
+company, website, contact_name, contact_email, status,
+lead_score, data_confidence, research_notes, pitch_notes, tags
+```
 
-**5. Preview.** Show how 3–5 representative rows will import (company, website, score, status — whatever was mapped). Separately flag any rows with issues (missing required field, invalid score, malformed URL).
+Columns that don't match → "skip".
 
-**6. User confirms.** Wait for explicit go-ahead. No auto-import.
+**5.** Preview 3–5 rows. Flag issues (missing required field, invalid score, malformed URL).
 
-**7. Import row by row.** For each row:
+**6.** Wait for explicit go-ahead. No auto-import.
 
+**7.** Import row by row. For each row:
 ```bash
 python3 -m db_helper get-lead --company "<company>"
 ```
-
-- If it exists → skip and flag as duplicate
-- If it doesn't exist →
-
+- Exists → skip, flag as duplicate
+- Doesn't exist →
 ```bash
 python3 -m db_helper add-lead "<Company Name>" \
     --website "<URL>" \
@@ -385,83 +406,99 @@ python3 -m db_helper add-lead "<Company Name>" \
     --research-notes "Imported from <filename> on <date>"
 ```
 
-Only include flags for fields that were mapped. Omit unmapped fields entirely (let db_helper defaults apply).
+Only include flags for mapped fields. For non-`lead` statuses, run `update-status` after adding.
 
-**Status handling:** `add-lead` does not accept a `--status` flag — all new leads enter as `lead`. If the CSV maps a status column and the value is a valid status other than `lead`, run `update-status` immediately after adding:
+**8.** Summary: total imported, skipped (duplicates), issues.
 
-```bash
-python3 -m db_helper update-status <lead-id> <status>
+### Import rules
+
 ```
-
-This two-step is only needed for non-default statuses. Most imports will just use the default `lead`.
-
-**8. Summary.** Report total imported, skipped (duplicates), and any issues.
-
-### Rules
-
-- **Required field:** `company` — skip and flag any row without it
-- **Defaults for unmapped fields:**
-  - `status` → `lead`
-  - `lead_score` → `NULL` (don't import arbitrary scores without validation)
-  - `data_confidence` → `LOW` (imported data hasn't been verified)
-  - `tags` → `imported` (always identifiable as CSV-sourced)
-- **Validation:**
-  - Scores must be integers 1–10 or NULL. Reject anything else.
-  - URLs should look like URLs (`http://` or `https://`). Reject obvious non-URLs.
-  - Statuses must match the valid status list. Reject unknown statuses.
-- **Batch cap:** Max 50 rows per batch. If the CSV has more, offer to process in batches.
-- **Skip columns:** Columns that don't map to our schema are silently skipped. Do NOT dump them into `research_notes` unless the user explicitly asks to preserve extra context.
-- **Duplicate check:** Before each `add-lead`, check for existing company. Skip and flag duplicates — never overwrite silently.
-- **Activity log:** Each imported lead gets `lead_imported` logged with the source filename.
-
-### Storage
-
-Copy the imported CSV to `$WEBCLIENT_STUDIO_CONFIG_DIR/imports/` (create directory if needed) with a timestamped filename: `<original-name>-<YYYY-MM-DD>.csv`. This provides an audit trail for which rows came from which file and when.
+✅ Required:        company — skip and flag rows without it
+✅ Default score:   NULL (don't import arbitrary scores)
+✅ Default status:  lead
+✅ Default tags:    imported
+✅ Default confidence: LOW
+✅ Validation:      scores 1–10 or NULL, URLs must look like URLs,
+                   statuses must be valid
+✅ Batch cap:       50 rows max (offer batches for larger files)
+✅ Duplicate check: before each add-lead
+✅ Audit trail:     copy CSV to imports/ with timestamped filename
+```
 
 ### What NOT to do
 
 - No auto-import without user confirming the mapping
 - No guessing values for unmapped columns
-- No importing score values without validating they're 1–10
 - No overwriting existing leads silently
-- No creating new database columns to match their CSV
 - No dumping unmapped columns into notes unless explicitly asked
-
-### Future: Excel (.xlsx) support
-
-Some users' "spreadsheet" is an Excel file. CSV-only is the current scope. If a user provides an `.xlsx` file, ask them to export as CSV first. Excel import is a candidate for a future enhancement.
+- No creating new DB columns to match their CSV
 
 ---
 
-## Error handling
+## §L. Quick Add
 
-The principles (pipeline-tracker.md §13):
+Add a company to the pipeline without a qualification report. Use when the user wants to track a lead before having time to qualify them.
 
-| Situation | Response |
-|---|---|
-| Database not found | Auto-created — should never surface. |
-| Empty pipeline | "No leads in pipeline. Run Lead Qualifier to add your first." |
-| Ambiguous company name | Present matching candidates with status + score. Ask user to pick. |
-| Lead not found | "No lead matching '<name>'. Try `show my pipeline` to see all." |
-| Export directory missing | Auto-created. |
-| Config file corrupted | Recreate with defaults. Preserve any salvageable values. |
+**Trigger:** "add [company] to my pipeline" (when no qualification report exists)
 
-Never just print the raw error from the shim. Translate to actionable language.
+### Flow
 
-## What requires confirmation
+**1.** Check if the company already exists:
+```bash
+python3 -m db_helper get-lead --company "<Company Name>"
+```
+If exists: tell the user and offer to show/update.
 
-- Status update to `lost` (§C)
-- Status update to `active` when no tasks exist (§C — flag, then confirm)
-- Deleting a lead (the shim doesn't expose this — refer the user to manual `sqlite3` if they really want to)
+**2.** Ask for the website URL (if not provided).
 
-Otherwise: status updates, tag changes, task updates, follow-ups, exports — no confirmation needed.
+**3.** Create a minimal lead row:
+```bash
+python3 -m db_helper add-lead "<Company Name>" --website "<URL>"
+```
+
+**4.** Tell the user: *"Added <Company> as a lead. No qualification report yet — run 'qualify <Company>' when you're ready to research and score them."*
+
+The lead enters with status `lead`, no score, no report. Pipeline Tracker's master view shows it under `⚪ Lead`. When the user eventually runs Lead Qualifier, it detects the existing entry, runs research, and upgrades the status to `qualified`.
+
+---
+
+## 🔒 Error handling
+
+```
+Database not found       → Auto-created — should never surface
+Empty pipeline           → "No leads yet. Run Lead Qualifier to add your first."
+Ambiguous company name   → Present candidates with status + score. Ask user.
+Lead not found           → "No lead matching '<name>'. Try 'show my pipeline'."
+Export dir missing       → Auto-created
+Config corrupted         → Recreate with defaults. Preserve salvageable values.
+```
+
+Never print raw shim errors. Translate to actionable language.
+
+## Confirmation rules
+
+```
+✅ Needs confirmation:   status → lost, status → active (no tasks)
+❌ No confirmation:      status updates (other), tags, tasks, follow-ups, exports
+```
 
 ## End-of-turn
 
-Mostly a one-line confirmation. Examples:
-- After master view: just the digest, plus a "next?" hook only if there are stale leads worth highlighting.
-- After deep view: the full dossier. Offer relevant actions: "Want to update status, add a task, or draft a follow-up email?"
-- After status update: `Acme: qualified → proposal_sent.`
-- After tag: `Tagged Acme as 'urgent'.`
-- After export: `Exported 12 leads to $WEBCLIENT_STUDIO_CONFIG_DIR/exports/pipeline-2026-04-26.csv.`
-- After follow-up logged: `Logged follow-up for Acme. Next stale check uses today as the anchor.`
+Mostly a one-line confirmation:
+
+```
+✅ "Acme: qualified → proposal_sent."
+✅ "Tagged Acme as 'urgent'."
+✅ "Exported 12 leads to $WEBCLIENT_STUDIO_CONFIG_DIR/exports/pipeline-2026-04-26.csv."
+✅ "Logged follow-up for Acme."
+```
+
+## Notes
+
+- **Format output** for the current channel — adapt formatting to match what the platform supports
+- **Cross-skill data contract:** reads these fields (written by Lead Qualifier, Proposal Builder, Project Onboarder):
+  - `lead_score`, `research_notes`, `pitch_notes`, `data_confidence`, `tags` → from Lead Qualifier
+  - `discovery_notes`, `proposal_summary` → from Proposal Builder
+  - Tasks → from Project Onboarder
+- **Stale leads:** flag once per session, don't repeat
+- **Ambiguous matches:** always present candidates and ask, never guess

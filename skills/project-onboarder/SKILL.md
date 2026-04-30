@@ -3,22 +3,20 @@ name: project-onboarder
 description: Turn a signed proposal into a running project. Use when the user says a client signed, accepted, or is ready to start. Creates project tasks in the database, generates a project brief, an onboarding checklist, and a draft sitemap, then sets the lead's status to active.
 ---
 
-# Project Onboarder
+# 🚀 Project Onboarder
 
 Take a client whose proposal was accepted and produce the four things needed to run the project: a brief, a checklist, a draft sitemap, and the initial set of tasks. This is the bridge between "sold" and "building."
 
-## When to use this skill
+## When to use
 
-Trigger phrases:
 - "set up project for <client>"
 - "onboard <client>"
 - "start project for <client>"
-- "create project for <client>"
 - "<client> signed the proposal"
 - "they said yes" (when a recent proposal exists)
 - "we're good to go with <client>"
 
-## Tools
+## ⚡ Tools
 
 ```bash
 SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"
@@ -26,108 +24,126 @@ PYTHONPATH="$SHARED" python3 -m db_helper <command>
 PYTHONPATH="$SHARED" python3 -m templates render <path> --json '...'
 ```
 
-### ⚠️ Path expansion in JSON arguments
-
-When passing file paths to `db_helper update-field` (which takes JSON), the shell does **not** expand variables like `$HOME` or `$WEBCLIENT_STUDIO_CONFIG_DIR` inside single quotes. Always expand paths before inserting them into JSON. Use double quotes with proper escaping, or assign the path to a variable first:
+**⚠️ Path expansion in JSON:** The shell does not expand variables inside single quotes. Always expand before inserting:
 
 ```bash
-# ❌ Wrong — $WEBCLIENT_STUDIO_CONFIG_DIR is stored as a literal string
+# ❌ Wrong — $VAR stored as literal
 python3 -m db_helper update-field <id> '{"path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/foo"}'
 
-# ✅ Right — variable expands before JSON is built
+# ✅ Right — variable expands first
 CLIENT_DIR="$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme"
 python3 -m db_helper update-field <id> '{"path": "'"$CLIENT_DIR"'"}'
 ```
 
-This matters because the database stores paths that are later read by other skills. A literal `$HOME` works for the current user but will not resolve correctly in all contexts.
+## Guard clause
 
+Before the flow, run:
 
-## First Run Check
-
-Before the flow below, run the guard clause:
 ```bash
 python3 -c "import sys,os; os.environ.get('WEBCLIENT_STUDIO_CONFIG_DIR') or exit(1); sys.path.insert(0, os.environ['WEBCLIENT_STUDIO_CONFIG_DIR']+'/shared'); import db_helper" 2>/dev/null && echo OK
 ```
 
-If `OK` — proceed to Flow.
+- **OK** → set `SHARED="$WEBCLIENT_STUDIO_CONFIG_DIR/shared"` and proceed. All `python3 -m` commands assume `PYTHONPATH="$SHARED"`.
+- **Fails** → read `$WEBCLIENT_STUDIO_CONFIG_DIR/references/setup.md` (or bundle's `references/setup.md`), execute setup, then return here.
 
-If it fails — read `references/setup.md` from the bundle source and execute the setup steps. Once setup completes, return here and proceed with the Flow.
-
-
-## Flow
+## 🔄 Flow
 
 ### 1. Find the lead
 
-```
+```bash
 python3 -m db_helper get-lead --company "<client>"
 ```
 
-**No match?** Check for a qualification report:
-```
+| Result | Action |
+|---|---|
+| One match | Continue with that lead row |
+| Multiple matches | Present with id, status, score. Ask user to pick |
+| No match | Check for a qualification report (below) |
+
+**No match — check for qualification report:**
+
+```bash
 ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<client-slug>* 2>/dev/null
+ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/clients/<client-slug>/<client-slug>* 2>/dev/null
 ```
-**If found:** Auto-add the lead to the pipeline (same flow as Proposal Builder Step 1 — create client folder, move report, store paths). Then proceed.
-**If not found:** Tell the user "No lead matching '<client>'. Run Lead Qualifier first or provide the company name." Offer to cancel.
 
-Disambiguate fuzzy matches with the user. Once you have the lead row, also fetch tags and any earlier qualification/proposal files:
+**If found:** Auto-add the lead to the pipeline. Capture the actual filename from the glob, create the client folder, move the report, and store the paths:
 
+```bash
+mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"
+mv "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<client-slug>* \
+   "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/clients/<client-slug>/"
+
+python3 -m db_helper add-lead "<Company Name>" \
+    --website "<URL from report>" \
+    --lead-score <score from report> \
+    --data-confidence <from report> \
+    --research-notes "<summary from report>" \
+    --pitch-notes "<pros/cons extracted from report>" \
+    --tags "<from report>" \
+    --client-dir-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>" \
+    --qualification-report-path "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>/<actual-filename>"
 ```
+
+Then proceed.
+
+**If not found:** "No lead matching '<client>'. Run Lead Qualifier first or provide the company name."
+
+Once you have the lead row, fetch tags and check for report paths:
+
+```bash
 python3 -m db_helper tag list --lead-id <lead-id>
 ```
 
-Check the lead row for report paths:
+Check the row for:
 - `qualification_report_path` — read the qualification report if the path exists
 - `proposal_report_path` — read the proposal if the path exists
 
-**If paths are null** (legacy lead from before client folders): Auto-migrate. Search for reports in the flat directories:
-```
+**If paths are null** (legacy lead): Auto-migrate by searching flat directories:
+
+```bash
 ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/qualifications/*<company-slug>* 2>/dev/null
 ls "$WEBCLIENT_STUDIO_CONFIG_DIR"/reports/proposals/*<company-slug>* 2>/dev/null
 ```
-If any reports found: create the client folder, move them, and store the paths (same migration pattern as Proposal Builder Step 3). If none found: proceed without reports (they may have been deleted).
 
-These reports give you the client context (from qualification) and agreed scope (from proposal) needed to build the project brief.
+If found: create client folder, move them, store paths. If not: proceed without reports.
 
 ### 2. Check for existing tasks
 
-```
+```bash
 python3 -m db_helper task list --lead-id <lead-id>
 ```
 
-If tasks already exist, ask: *"This client has 4 existing tasks. Add the new onboarding tasks to the existing set, or do you want to start fresh? (Starting fresh leaves the old tasks but adds the new ones — I won't delete anything.)"* Wait for the answer.
+If tasks exist: *"This client has N existing tasks. Add the new onboarding tasks, or start fresh? (Starting fresh keeps old tasks — I won't delete anything.)"* Wait for answer.
 
 ### 3. Determine the project directory
 
 Check the lead row for `client_dir_path`:
 
-**If it exists:** Use that directory. This is the client folder created when the lead was added to the pipeline. All reports for this client live here.
-
-**If it is null** (lead was added before this feature): Create the folder:
 ```
-mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"
-```
-Then store it:
-```
-python3 -m db_helper update-field <lead-id> '{"client_dir_path": "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"}'
+Path exists  → Use that directory (created when lead was added to pipeline)
+Path is null  → Create it and store:
+                mkdir -p "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<client-slug>"
+                update-field <lead-id> '{"client_dir_path": "<path>"}'
 ```
 
-Do NOT create a separate `reports/projects/<slug>/` directory. All client files go into the client folder.
+**All client files go in the client folder.** Do NOT create a separate `reports/projects/` directory.
 
 You'll write three files there:
 - `project-brief.md` — internal reference for the freelancer
 - `onboarding-checklist.md` — what to collect from the client
-- `sitemap.md` — draft IA (skip with note if scope too small or content unclear)
+- `sitemap.md` — draft IA (skip with note if scope too small)
 
 ### 4. Render the brief
 
-The brief follows the structure in `project-onboarder.md` §5. You can render it directly or assemble from the lead row + proposal — either way, the structure is fixed:
+Structure is fixed — assemble from lead row + proposal + discovery notes:
 
 ```markdown
 # Project Brief: <Company Name>
 
 **Client:** <Company>
 **Start Date:** <today>
-**Target Launch:** <from proposal timeline if specified, else "[To be confirmed]">
+**Target Launch:** <from proposal timeline, else "[To be confirmed]">
 **Service Type:** <from tags or discovery>
 
 ---
@@ -136,35 +152,35 @@ The brief follows the structure in `project-onboarder.md` §5. You can render it
 2–3 paragraphs synthesising lead research + discovery notes.
 
 ## Project Goals
-What the client wants to achieve, in their own words where possible. Pull from discovery notes.
+What the client wants to achieve, in their own words where possible.
 
 ## Scope Summary
 Condensed from proposal. Key deliverables, explicit exclusions.
 
 ## Key Contacts
-- **Primary:** <name, role, email, phone — from discovery or pipeline>
-- **Technical:** <if different — hosting, domain access>
+- **Primary:** <name, role, email, phone>
+- **Technical:** <if different — hosting, domain>
 - **Content:** <who provides copy, images>
 
 ## Technical Requirements
-Hosting, CMS, integrations, third-party services, SSL, domain. Pull from discovery + proposal.
+Hosting, CMS, integrations, third-party services, SSL, domain.
 
 ## Content Status
 - Copy: provided | pending | needs writing
 - Images: provided | pending | needs photography
-- Logo: provided | pending | needs design — **flag: this is NOT something the agent generates**
+- Logo: provided | pending | needs design — **NOT generated by the agent**
 - Brand guidelines: provided | pending | none exist
 
 ## Timeline & Milestones
 From proposal timeline, converted to actual dates where possible.
 
 ## Notes & Assumptions
-Any assumptions made, things to verify, risks flagged during discovery.
+Assumptions made, things to verify, risks flagged.
 
 ## Links
 - Qualification report: <path if exists>
 - Proposal: <path if exists>
-- Project directory: <path to reports/projects/<slug>/>
+- Project directory: <client_dir_path>
 - Client website: <URL>
 ```
 
@@ -172,33 +188,32 @@ For any section discovery doesn't cover, write `[To be confirmed]` — never gue
 
 ### 5. Render the onboarding checklist
 
-Use the template:
-```
+```bash
 python3 -m templates render onboarding-checklists/default.md \
     --json '{"company": "<name>", "service_type": "<type>"}' \
     --out "$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/<slug>/onboarding-checklist.md"
 ```
 
-The checklist has four sections (project-onboarder.md §6):
-- **Assets to collect** — logo, brand guidelines, colours, fonts, photography, copy, marketing materials
-- **Access & accounts** — domain registrar, hosting, CMS admin, analytics, social, email
-- **Information needed** — decision makers, communication preferences, competitor sites, references, deadlines
-- **Approvals process** — who approves design, who approves content, how revisions submitted, expected turnaround
+Four sections:
 
-Each item carries a status marker: `Pending` | `Received` | `Not Needed`. Default everything to `Pending`. Adjust based on what discovery notes already covered (e.g. if they mentioned WordPress, mark "CMS admin access" as Pending and add a note).
+```
+📌 Assets to collect     — logo, brand guidelines, colours, fonts, photography, copy
+📌 Access & accounts     — domain registrar, hosting, CMS admin, analytics, social
+📌 Information needed    — decision makers, communication, competitors, references
+📌 Approvals process     — who approves design/content, revision process, turnaround
+```
+
+Each item: `Pending` | `Received` | `Not Needed`. Default to `Pending`. Adjust based on discovery notes.
 
 ### 6. Generate a draft sitemap
 
-Read the proposal scope and discovery notes. Identify main content areas. Propose a page hierarchy.
-
-Write to `<project-dir>/sitemap.md`:
+Read proposal scope and discovery notes. Identify content areas. Write to `<client-dir>/sitemap.md`:
 
 ```markdown
 # Sitemap Draft: <Company>
 
 **Status:** Draft for review with client. Not final.
 
-```
 Home
 ├── About
 │   ├── Our Story
@@ -211,93 +226,115 @@ Home
 └── Legal
     ├── Privacy Policy
     └── Terms
-```
 
 For each page:
 - **Home:** <purpose, key sections, primary CTA>
 - **Services:** <main services, structure, pricing if relevant>
-- ...
 
 ## Open questions
 - [Confirm with client: <thing>]
 ```
 
-**Skip the sitemap entirely** if:
-- Project is a single landing page
-- Discovery notes give no useful content structure
-- The user explicitly said they don't need one
-
-If skipping, add a line to the project brief's "Notes & Assumptions" section: *"Sitemap skipped: <reason>."*
+**Skip entirely** if single landing page, no useful content structure, or user said they don't need one. Add to brief notes: *"Sitemap skipped: <reason>."*
 
 ### 7. Pre-populate tasks
 
-Based on the proposal scope, create high-level milestone tasks. Don't over-specify ("Create header component" is too granular; "Design homepage mockup" is right).
+Based on proposal scope, create milestone tasks. Right level of granularity:
 
-Examples for a typical web design project:
-- "Kickoff call with client"
-- "Collect brand assets (logo, colours, fonts)"
-- "Collect content (copy, images)"
-- "Design homepage mockup"
-- "Client review — design round 1"
-- "Build out remaining pages"
-- "QA and cross-browser testing"
-- "Client review — pre-launch"
-- "Launch"
-
-Add each one:
 ```
+✅ "Design homepage mockup"        (right — a milestone)
+❌ "Create header component"        (too granular)
+```
+
+Typical web design project:
+```
+Kickoff call with client
+Collect brand assets (logo, colours, fonts)
+Collect content (copy, images)
+Design homepage mockup
+Client review — design round 1
+Build out remaining pages
+QA and cross-browser testing
+Client review — pre-launch
+Launch
+```
+
+```bash
 python3 -m db_helper task add \
     --lead-id <lead-id> --name "Kickoff call with client" --priority high
 ```
 
-The shim auto-logs `task_created` per task.
+Auto-logs `task_created` per task.
 
 ### 8. Update the lead row
 
-```
+```bash
 python3 -m db_helper update-field <lead-id> \
-    '{"project_path": "<path to reports/projects/<slug>/>"}'
+    '{"project_path": "<client_dir_path>"}'
 
 python3 -m db_helper update-status <lead-id> active
 ```
 
-The first call auto-logs `project_started` (because `update-field` infers `project_started` when `project_path` is set). The second logs `status_changed`.
+The first call auto-logs `project_started`. The second logs `status_changed`.
 
-### 9. Optional: welcome / kickoff email draft
+### 9. Optional: welcome email draft
 
 Offer once: *"Want a welcome email draft for the client?"*
 
-Rules (project-onboarder.md §10):
+If yes, read the project brief first (if not already in context):
+
+```bash
+cat "$CLIENT_DIR/project-brief.md"
+```
+
+Also read the onboarding checklist for what to reference:
+
+```bash
+cat "$CLIENT_DIR/onboarding-checklist.md"
+```
+
+Use both files to write a personalised email that references the actual scope and next steps. If files don't exist, fall back to DB fields.
+
+Output **in chat only**:
 - Thank them for choosing the freelancer
 - Summarise next steps (kickoff call, asset collection, timeline)
 - Reference what you need from them (point at the checklist)
-- Set communication expectations (how often, via what channel)
-- Warm but professional — sets the tone
-
-Output **in chat only**.
+- Set communication expectations
+- Warm but professional
+- **Do not use generic template language** — reference the actual project scope, specific deliverables, and real next steps from the project brief and checklist. Mention their company name, their project, their timeline.
 
 ## Edge cases
 
-| Scenario | Approach |
-|---|---|
-| No proposal exists | Proceed with available context. Flag in the brief: "No formal proposal found. Brief built from lead research + user input." |
-| No discovery notes anywhere | Minimal brief with placeholders. Freelancer fills in during kickoff call. |
-| Tasks already exist | Step 2 handled — ask the user. |
-| Very small project (single page) | Shorter brief, minimal checklist, skip sitemap. |
-| Very large multi-phase project | Suggest phased onboarding. Create Phase 1 tasks now, note remaining phases in the brief. |
-| Multiple decision makers | Capture all in Key Contacts. Note who has final authority if mentioned. |
-| Existing site with lots of content | Add to brief: "Content migration needed from existing site. Audit before finalising sitemap." |
+```
+No proposal exists        → Proceed with available context. Flag in brief.
+No discovery notes        → Minimal brief with placeholders.
+Tasks already exist       → Step 2 handles — ask user.
+Single page project       → Shorter brief, minimal checklist, skip sitemap.
+Large multi-phase project → Phased onboarding. Phase 1 tasks now, note rest in brief.
+Multiple decision makers  → Capture all in Key Contacts. Note final authority.
+Existing site, lots of content → "Content migration needed. Audit before sitemap."
+```
 
 ## What this skill does NOT do
 
-- Does not generate logos, brand guidelines, design mockups, or any visual creative work (architecture §2.5)
-- Does not contact the client directly (architecture §2.4)
-- Does not commit to deadlines or pricing on behalf of the freelancer
-- Does not delete existing tasks (only adds — see step 2)
+- Generate logos, brand guidelines, design mockups, or any visual creative
+- Contact the client directly
+- Commit to deadlines or pricing on behalf of the freelancer
+- Delete existing tasks (only adds — see Step 2)
 
 ## End-of-turn
 
-Tell the user: project directory path, number of tasks created, lead status now `active`. Offer the optional welcome email.
+Tell the user: project directory path, tasks created, status now `active`. Offer the welcome email.
 
-Example:
-> Created `$WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme-plumbing/` with project-brief.md, onboarding-checklist.md, sitemap.md. Added 9 tasks. Lead status updated to `active`. Want a welcome email draft for the client?
+```
+"Created $WEBCLIENT_STUDIO_CONFIG_DIR/reports/clients/acme-plumbing/ with project-brief.md, onboarding-checklist.md, sitemap.md. Added 9 tasks. Status → active. Want a welcome email draft?"
+```
+
+## Notes
+
+- **Format output** for the current channel — adapt formatting to match what the platform supports
+- **Cross-skill data contract:**
+  - **Reads** from Lead Qualifier: `qualification_report_path`, `research_notes`, `tags`, `client_dir_path`
+  - **Reads** from Proposal Builder: `proposal_report_path`, `discovery_notes`, scope details
+  - **Writes** for Pipeline Tracker: `project_path`, tasks, status → `active`
+- **All client files live in `reports/clients/<slug>/`** — never in a separate `reports/projects/` directory
