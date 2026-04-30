@@ -130,6 +130,8 @@ python3 -m db_helper activity --lead-id <id>
 **Master view** — wrapped in a code block for visual separation from chat:
 
 ```
+📋 Job Pipeline
+
 🟢 Active
 • Apex Roofing — score 8/10 — 3 tasks remaining
 • Beehive Bakery — score 6/10 — 1 task remaining
@@ -149,6 +151,15 @@ python3 -m db_helper activity --lead-id <id>
 ✅ Complete
 • Greenfield Landscaping — score 7/10 — completed 2026-04-10
 ```
+
+**After the code block**, add a brief conversational response that helps the user act on their pipeline. Contextual and natural — not generic. Examples:
+
+- *"Cedarwood Dental has been quiet for 12 days. Want me to draft a follow-up?"*
+- *"You've got 2 proposals out — want to check on either?"*
+- *"Sunrise Fitness scored a 9. Want me to pull up their details?"*
+- *"Nothing needing attention right now. 8 leads in the pipeline across 5 stages."*
+
+Pick the most useful suggestion based on what's in the pipeline (stale leads, recent additions, high scores). Keep it to one suggestion. Don't list every option — the user can ask.
 
 **Deep view** — wrapped in a code block:
 
