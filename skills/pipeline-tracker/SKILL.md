@@ -218,6 +218,16 @@ tag_added / tag_removed → filtered out (shown in Tags section)
 
 Filter out `tag_added`/`tag_removed` from activity (shown in Tags section). Use action code translations from §F.
 
+**After the code block**, add a brief conversational response suggesting the next logical action based on the lead's status:
+
+- Status `qualified` → *"Want me to draft a proposal for Apex Roofing?"*
+- Status `proposal_sent`, stale → *"Cedarwood Dental hasn't responded in 12 days. Want me to draft a follow-up?"*
+- Status `active` with pending tasks → *"3 tasks remaining — want to see just the tasks?"*
+- Status `lead` (quick-added) → *"Northstar Accounting hasn't been qualified yet. Want me to run a qualification report?"*
+- Status `complete` or `lost` → no suggestion needed, just acknowledge
+
+Pick the single most useful next step. Don't list every option.
+
 For ambiguous company matches, present all candidates with status + score. Ask the user to pick.
 
 ---
